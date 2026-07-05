@@ -1,0 +1,53 @@
+.main { max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; display: flex; flex-direction: column; gap: 24px; }
+.header { margin-bottom: 8px; }
+.title { font-size: 2rem; font-weight: 800; margin-bottom: 10px; }
+.desc { color: var(--text-secondary); max-width: 640px; line-height: 1.7; font-size: 0.95rem; }
+
+.inputCard { padding: 24px; display: flex; flex-direction: column; gap: 14px; }
+.inputRow { display: flex; gap: 12px; }
+.auditBtn { flex-shrink: 0; padding: 12px 28px; }
+.x402Note { font-size: 0.78rem; color: var(--text-muted); }
+.x402Note strong { color: var(--accent-cyan); }
+
+.scanCard { padding: 24px; }
+.steps { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.stepItem { display: flex; align-items: center; gap: 12px; font-size: 0.85rem; transition: color 0.3s; }
+.stepDone { color: var(--text-primary); }
+.stepPending { color: var(--text-muted); }
+.stepIcon { font-family: 'JetBrains Mono', monospace; width: 16px; color: var(--accent-cyan); }
+
+.errorCard { padding: 20px 24px; border-color: rgba(255,68,68,0.4) !important; background: rgba(255,68,68,0.06) !important; color: var(--accent-red); font-weight: 600; }
+
+.results { display: flex; flex-direction: column; gap: 20px; }
+
+.scoreCard { padding: 28px; display: flex; justify-content: space-between; align-items: flex-start; gap: 32px; }
+.scoreLeft { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+.contractAddr { font-size: 1rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: var(--accent-cyan); word-break: break-all; }
+.summary { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6; }
+.tags { display: flex; gap: 8px; flex-wrap: wrap; }
+.onChain { font-size: 0.8rem; color: var(--text-muted); }
+.auditedAt { font-size: 0.75rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+.gaugeWrap { flex-shrink: 0; }
+
+.findingsCard { padding: 24px; }
+.noFindings { color: var(--accent-green); font-weight: 600; padding: 16px 0; }
+.findings { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.finding { padding: 14px 16px; border-radius: 8px; border-left: 3px solid; }
+.critical { border-left-color: #ff4444; background: rgba(255,68,68,0.06); }
+.high     { border-left-color: #ff8800; background: rgba(255,136,0,0.06); }
+.medium   { border-left-color: #ffcc00; background: rgba(255,204,0,0.06); }
+.low      { border-left-color: var(--accent-cyan); background: rgba(0,212,255,0.04); }
+.info     { border-left-color: var(--border-bright); background: rgba(26,58,107,0.3); }
+.findingHeader { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+.findingCategory { font-size: 0.7rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; background: rgba(26,58,107,0.5); padding: 2px 6px; border-radius: 4px; }
+.findingDesc { font-size: 0.83rem; color: var(--text-secondary); margin-bottom: 6px; line-height: 1.5; }
+.findingRec { font-size: 0.8rem; color: var(--text-muted); }
+
+.gasCard { padding: 24px; }
+.gasList { list-style: none; display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.gasItem { font-size: 0.85rem; color: var(--text-secondary); padding: 8px 12px; background: rgba(26,58,107,0.3); border-radius: 6px; }
+
+@media (max-width: 768px) {
+  .inputRow { flex-direction: column; }
+  .scoreCard { flex-direction: column; }
+}

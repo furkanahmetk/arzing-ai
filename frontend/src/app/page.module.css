@@ -1,0 +1,55 @@
+.main { max-width: 1280px; margin: 0 auto; padding: 40px 24px 80px; display: flex; flex-direction: column; gap: 32px; }
+
+/* Hero */
+.hero { display: grid; grid-template-columns: 1fr 340px; gap: 32px; align-items: center; }
+.heroBadge { margin-bottom: 18px; width: fit-content; }
+.heroTitle { font-size: 2.8rem; font-weight: 800; line-height: 1.1; letter-spacing: -0.03em; margin-bottom: 18px; }
+.heroDesc { font-size: 1rem; color: var(--text-secondary); line-height: 1.7; max-width: 480px; margin-bottom: 28px; }
+.heroCta { display: flex; gap: 12px; flex-wrap: wrap; }
+.gaugeCard { padding: 28px 24px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.threatBadge { width: 100%; display: flex; justify-content: center; }
+
+/* Stats */
+.statsRow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+/* Bottom */
+.bottomGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.panel { padding: 24px; min-height: 320px; }
+
+/* API Banner */
+.apiBanner {
+  padding: 24px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  background: linear-gradient(135deg, rgba(0, 102, 255, 0.12), rgba(0, 212, 255, 0.06));
+  border-color: rgba(0, 212, 255, 0.25) !important;
+}
+.apiBannerLeft { display: flex; align-items: flex-start; gap: 16px; }
+.apiBannerTitle { font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; }
+.apiBannerDesc { font-size: 0.85rem; color: var(--text-secondary); max-width: 480px; line-height: 1.6; }
+.apiBannerCode {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 18px;
+  font-size: 0.78rem;
+  color: var(--accent-cyan);
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1.8;
+}
+
+@media (max-width: 1024px) {
+  .hero { grid-template-columns: 1fr; }
+  .gaugeCard { max-width: 320px; }
+  .statsRow { grid-template-columns: repeat(2, 1fr); }
+  .apiBanner { flex-direction: column; align-items: flex-start; }
+}
+@media (max-width: 768px) {
+  .heroTitle { font-size: 2rem; }
+  .statsRow { grid-template-columns: repeat(2, 1fr); }
+  .bottomGrid { grid-template-columns: 1fr; }
+  .apiBannerCode { white-space: normal; }
+}

@@ -1,0 +1,10 @@
+.card { padding: 20px; display: flex; flex-direction: column; gap: 6px; }
+.icon { font-size: 1.6rem; margin-bottom: 4px; }
+.value { font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; }
+.label { font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); }
+.sub { font-size: 0.72rem; color: var(--text-muted); }
+.skeleton { display: block; width: 80px; height: 2rem; background: var(--border); border-radius: 4px; animation: blink 1.5s infinite; }
+.cyan .value { color: var(--accent-cyan); text-shadow: 0 0 20px rgba(0,212,255,0.3); }
+.green .value { color: var(--accent-green); text-shadow: 0 0 20px rgba(0,255,136,0.3); }
+.yellow .value { color: var(--accent-yellow); text-shadow: 0 0 20px rgba(255,204,0,0.3); }
+.red .value { color: var(--accent-red); text-shadow: 0 0 20px rgba(255,68,68,0.3); }

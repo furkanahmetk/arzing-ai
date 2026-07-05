@@ -1,0 +1,8 @@
+.list { display: flex; flex-direction: column; gap: 6px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 12px; border-radius: 8px; transition: background 0.2s; }
+.row:hover { background: rgba(26,58,107,0.3); }
+.key { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 0.82rem; font-weight: 600; color: var(--text-primary); }
+.meta { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.uptime { font-size: 0.78rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+.seeAll { display: block; text-align: center; margin-top: 10px; font-size: 0.8rem; color: var(--accent-cyan); text-decoration: none; padding: 6px; border-radius: 6px; transition: background 0.2s; }
+.seeAll:hover { background: rgba(0,212,255,0.08); }

@@ -1,0 +1,242 @@
+import OpenAI from 'openai'
+import axios from 'axios'
+import { exec } from 'child_process'
+import util from 'util'
+
+const execAsync = util.promisify(exec)
+import { RiskScorer } from '../analysis/risk-scorer'
+import { RustAnalyzer } from '../analysis/rust-analyzer'
+import { CsprCloudService } from '../services/cspr-cloud'
+import { logger } from '../index'
+
+export interface AuditFinding {
+  severity: 'critical' | 'high' | 'medium' | 'low' | 'info'
+  category: string
+  title: string
+  description: string
+  recommendation: string
+}
+
+export interface AuditResult {
+  contractAddress: string
+  riskScore: number
+  summary: string
+  findings: AuditFinding[]
+  gasOptimizations: string[]
+  cep18Compliant?: boolean
+  cep78Compliant?: boolean
+  upgradeableRisk?: string
+  auditedAt: string
+  onChainTxHash?: string
+}
+
+export class AuditorAgent {
+  private openai: OpenAI
+  private scorer: RiskScorer
+  private rustAnalyzer: RustAnalyzer
+  private cloud: CsprCloudService
+
+  constructor() {
+    this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    this.scorer = new RiskScorer()
+    this.rustAnalyzer = new RustAnalyzer()
+    this.cloud = new CsprCloudService()
+  }
+
+  async run(target: string): Promise<AuditResult> {
+    logger.info(`[Auditor] Starting audit for: ${target}`)
+
+    // Step 1: Fetch source material
+    const source = await this.fetchSource(target)
+
+    // Step 2: Static pattern analysis
+    const staticFindings = this.rustAnalyzer.analyze(source.code)
+
+    // Step 3: AI deep analysis via LLM
+    const aiFindings = await this.aiAnalysis(source.code, source.contractType)
+
+    // Step 4: Standard compliance checks
+    const compliance = this.checkCompliance(source.code)
+
+    // Step 5: Merge & score
+    const allFindings = [...staticFindings, ...aiFindings]
+    const riskScore = this.scorer.score(allFindings)
+    const summary = await this.generateSummary(target, riskScore, allFindings)
+
+    // Step 6: Write to on-chain audit registry
+    const onChainTxHash = await this.writeOnChain(target, riskScore, allFindings).catch(() => undefined)
+
+    const result: AuditResult = {
+      contractAddress: target,
+      riskScore,
+      summary,
+      findings: allFindings,
+      gasOptimizations: this.scorer.gasOptimizations(source.code),
+      cep18Compliant: compliance.cep18,
+      cep78Compliant: compliance.cep78,
+      upgradeableRisk: compliance.upgradeableRisk,
+      auditedAt: new Date().toISOString(),
+      onChainTxHash,
+    }
+
+    logger.info(`[Auditor] Audit complete — Risk: ${riskScore} — Findings: ${allFindings.length}`)
+    return result
+  }
+
+  private async fetchSource(target: string): Promise<{ code: string; contractType: string }> {
+    // GitHub URL
+    if (target.startsWith('https://github.com')) {
+      let rawUrl = target
+        .replace('github.com', 'raw.githubusercontent.com')
+        .replace('/blob/', '/')
+        .replace('/tree/', '/')
+      
+      try {
+        const res = await axios.get(rawUrl, { timeout: 10000 })
+        return { code: res.data as string, contractType: 'github' }
+      } catch (err: any) {
+        // If it's a 404 (maybe it's a directory), try appending /src/lib.rs or /src/main.rs
+        if (err.response?.status === 404 && !rawUrl.endsWith('.rs')) {
+          try {
+            const libRes = await axios.get(rawUrl.replace(/\/$/, '') + '/src/lib.rs', { timeout: 5000 })
+            return { code: libRes.data as string, contractType: 'github' }
+          } catch {
+            const mainRes = await axios.get(rawUrl.replace(/\/$/, '') + '/src/main.rs', { timeout: 5000 })
+            return { code: mainRes.data as string, contractType: 'github' }
+          }
+        }
+        throw new Error(`Failed to fetch GitHub source: ${err.message}`)
+      }
+    }
+
+    // Casper contract hash — try to get associated source via CSPR.cloud
+    const contractInfo = await this.cloud.getContractInfo(target).catch(() => null)
+    if (contractInfo?.sourceUrl) {
+      const res = await axios.get(contractInfo.sourceUrl, { timeout: 10000 })
+      return { code: res.data as string, contractType: 'on-chain' }
+    }
+
+    // Return metadata stub for hash-only audits
+    return {
+      code: `// Contract: ${target}\n// Source not publicly available\n// Analyzing ABI and deployment metadata only`,
+      contractType: 'hash-only',
+    }
+  }
+
+  private async aiAnalysis(code: string, contractType: string): Promise<AuditFinding[]> {
+    if (!process.env.OPENAI_API_KEY) return []
+
+    const prompt = `You are a Casper Network smart contract security expert specializing in Rust/WebAssembly contracts.
+
+Analyze the following Casper smart contract code for security vulnerabilities. Focus on:
+1. Reentrancy vulnerabilities (cross-contract call patterns)
+2. Integer overflow/underflow
+3. Access control issues (missing authorization checks)
+4. Unsafe storage manipulation
+5. Improper purse management (CSPR token handling)
+6. Upgradeable contract risks (key weight issues)
+7. CEP-18 / CEP-78 standard violations
+8. Gas griefing patterns
+
+Contract type: ${contractType}
+
+\`\`\`rust
+${code.slice(0, 6000)}
+\`\`\`
+
+Return a JSON array of findings with this exact structure (no extra text):
+[{"severity":"critical|high|medium|low|info","category":"string","title":"string","description":"string","recommendation":"string"}]
+
+If no vulnerabilities found, return: []`
+
+    try {
+      const res = await this.openai.chat.completions.create({
+        model: process.env.LLM_MODEL || 'gpt-4o',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.1,
+        response_format: { type: 'json_object' },
+      })
+      const content = res.choices[0]?.message?.content || '{"findings":[]}'
+      const parsed = JSON.parse(content)
+      return Array.isArray(parsed) ? parsed : (parsed.findings || [])
+    } catch (err) {
+      logger.warn('[Auditor] LLM analysis failed, using static only', err)
+      return []
+    }
+  }
+
+  private checkCompliance(code: string) {
+    const hasCep18 = code.includes('cep18') || code.includes('CEP18') || (code.includes('total_supply') && code.includes('balance_of') && code.includes('transfer'))
+    const hasCep78 = code.includes('cep78') || code.includes('CEP78') || (code.includes('mint') && code.includes('token_owner') && code.includes('metadata'))
+    const upgradeableRisk = code.includes('upgrade') && !code.includes('require_owner') && !code.includes('assert_caller')
+      ? 'No ownership check found on upgrade path'
+      : undefined
+    return { cep18: hasCep18, cep78: hasCep78, upgradeableRisk }
+  }
+
+  private async generateSummary(target: string, score: number, findings: AuditFinding[]): Promise<string> {
+    const critical = findings.filter(f => f.severity === 'critical').length
+    const high = findings.filter(f => f.severity === 'high').length
+    if (critical > 0) return `⚠️ CRITICAL: ${critical} critical vulnerabilities found. Immediate remediation required before mainnet deployment.`
+    if (high > 0) return `🟠 HIGH RISK: ${high} high-severity issues detected. Review and fix before deployment.`
+    if (score < 30) return `✅ LOW RISK: Contract scored ${score}/100. ${findings.length} minor findings. Generally safe for deployment.`
+    return `🟡 MEDIUM RISK: Contract scored ${score}/100 with ${findings.length} findings. Review recommended.`
+  }
+
+  private async writeOnChain(target: string, riskScore: number, findings: AuditFinding[]): Promise<string | undefined> {
+    try {
+      logger.info('[Auditor] Writing audit result on-chain...')
+      
+      const crit = findings.filter(f => f.severity === 'critical').length
+      const high = findings.filter(f => f.severity === 'high').length
+      const med = findings.filter(f => f.severity === 'medium').length
+      const low = findings.filter(f => f.severity === 'low').length
+      
+      const hash = process.env.AUDIT_REGISTRY_CONTRACT_HASH
+      const nodeUrl = process.env.CASPER_NODE_URL || 'https://node.testnet.casper.network'
+      const chainName = process.env.CASPER_NETWORK_NAME || 'casper-test'
+      const keyPath = process.env.AGENT_PRIVATE_KEY
+      
+      if (!hash || !keyPath) {
+        logger.warn('[Auditor] Cannot write on-chain: missing contract hash or private key.')
+        return undefined
+      }
+
+      // Safe summary string
+      let safeSummary = await this.generateSummary(target, riskScore, findings)
+      safeSummary = safeSummary.replace(/'/g, "").replace(/"/g, "")
+
+      const cmd = `casper-client put-deploy \
+        --node-address ${nodeUrl}/rpc \
+        --chain-name ${chainName} \
+        --secret-key ${keyPath} \
+        --session-package-hash ${hash} \
+        --session-entry-point submit_audit \
+        --payment-amount 5000000000 \
+        --session-arg "contract_target:string='${target}'" \
+        --session-arg "risk_score:u8='${riskScore}'" \
+        --session-arg "summary:string='${safeSummary.substring(0, 100)}'" \
+        --session-arg "findings_critical:u8='${crit}'" \
+        --session-arg "findings_high:u8='${high}'" \
+        --session-arg "findings_medium:u8='${med}'" \
+        --session-arg "findings_low:u8='${low}'" \
+        --session-arg "audited_at_ms:u64='${Date.now()}'" \
+        --session-arg "audit_date:string='${new Date().toISOString()}'"`
+        
+      const { stdout } = await execAsync(cmd)
+      
+      // Strip casper-client warnings before parsing JSON
+      const jsonStart = stdout.indexOf('{')
+      const cleanStdout = jsonStart !== -1 ? stdout.substring(jsonStart) : stdout
+      
+      const parsed = JSON.parse(cleanStdout)
+      const deployHash = parsed.result?.deploy_hash || parsed.result?.transaction_hash
+      
+      logger.info(`[Auditor] Successfully dispatched on-chain transaction: ${deployHash}`)
+      return deployHash
+    } catch (e: any) {
+      logger.error('[Auditor] Failed to write on-chain:', e.message)
+      return undefined
+    }
+  }
+}

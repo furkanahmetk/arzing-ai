@@ -1,0 +1,30 @@
+.main { max-width: 1280px; margin: 0 auto; padding: 40px 24px 80px; display: flex; flex-direction: column; gap: 28px; }
+.header { display: flex; flex-direction: column; gap: 10px; }
+.title { font-size: 2rem; font-weight: 800; }
+.desc { color: var(--text-secondary); font-size: 0.95rem; line-height: 1.7; max-width: 600px; }
+.liveTag { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; font-weight: 700; color: var(--accent-green); font-family: 'JetBrains Mono', monospace; letter-spacing: 0.05em; }
+.liveDot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-green); box-shadow: 0 0 8px var(--accent-green); animation: pulse-ring 2s infinite; }
+
+.metricGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.metricCard { padding: 20px; display: flex; flex-direction: column; gap: 6px; }
+.metricIcon { font-size: 1.4rem; }
+.metricValue { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; }
+.cyan { color: var(--accent-cyan); text-shadow: 0 0 16px rgba(0,212,255,0.3); }
+.green { color: var(--accent-green); text-shadow: 0 0 16px rgba(0,255,136,0.3); }
+.yellow { color: var(--accent-yellow); }
+.red { color: var(--accent-red); }
+.metricLabel { font-size: 0.78rem; color: var(--text-muted); font-weight: 500; }
+
+.bottomGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.agentCard { padding: 24px; }
+.agentRows { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.agentRow { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; background: rgba(10,22,40,0.5); }
+.agentDot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.dotGreen { background: var(--accent-green); box-shadow: 0 0 6px var(--accent-green); }
+.dotGray { background: var(--text-muted); }
+.agentName { font-size: 0.85rem; font-weight: 600; color: var(--text-primary); }
+.agentDetail { font-size: 0.75rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; margin-top: 1px; }
+.alertPanel { padding: 24px; }
+
+@media (max-width: 1024px) { .metricGrid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 768px) { .bottomGrid { grid-template-columns: 1fr; } .metricGrid { grid-template-columns: repeat(2, 1fr); } }

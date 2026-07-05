@@ -1,0 +1,3 @@
+[[contracts]]
+name = "casperguard_audit_registry"
+fqn = "AuditRegistry"

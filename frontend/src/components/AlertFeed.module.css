@@ -1,0 +1,11 @@
+.feed { display: flex; flex-direction: column; gap: 8px; }
+.item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 8px; border-left: 3px solid; transition: background 0.2s; }
+.item:hover { background: rgba(26,58,107,0.3); }
+.info  { border-left-color: var(--accent-cyan);   background: rgba(0,212,255,0.04); }
+.warn  { border-left-color: var(--accent-yellow); background: rgba(255,204,0,0.04); }
+.danger{ border-left-color: var(--accent-red);    background: rgba(255,68,68,0.04); }
+.levelIcon { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+.body { flex: 1; min-width: 0; }
+.title { font-size: 0.82rem; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+.message { font-size: 0.75rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.time { font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; font-family: 'JetBrains Mono', monospace; }
