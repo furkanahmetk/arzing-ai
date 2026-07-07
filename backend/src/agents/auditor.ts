@@ -325,12 +325,27 @@ Write a comprehensive, deep, and highly detailed markdown-formatted report conta
       }
 
       // Extract REPORT
-      const reportMatch = content.match(/<REPORT>\s*([\s\S]*?)\s*<\/REPORT>/i);
-      if (reportMatch) {
-          markdownReport = reportMatch[1];
-      } else if (!jsonMatch) {
-          // If no tags at all, maybe the whole thing is the report?
+      const reportMatch = content.match(/<REPORT>\s*([\s\S]*?)(?:<\/REPORT>|$)/i);
+      if (reportMatch && reportMatch[1].trim().length > 0) {
+          markdownReport = reportMatch[1].trim();
+      } else {
+          // If no tags at all or report is empty, use the content but strip out the JSON array
           markdownReport = content;
+          const firstBracket = content.indexOf('[');
+          const lastBracket = content.lastIndexOf(']');
+          if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+              markdownReport = content.substring(0, firstBracket) + "\n\n" + content.substring(lastBracket + 1);
+          }
+          
+          // Clean up any residual markdown blocks or tags
+          markdownReport = markdownReport.replace(/```json/gi, '').replace(/```/g, '');
+          markdownReport = markdownReport.replace(/<JSON>/gi, '').replace(/<\/JSON>/gi, '');
+          markdownReport = markdownReport.replace(/<REPORT>/gi, '').replace(/<\/REPORT>/gi, '');
+          markdownReport = markdownReport.trim();
+          
+          if (!markdownReport) {
+              markdownReport = 'The LLM successfully generated a security profile but did not provide a detailed markdown summary.';
+          }
       }
       
       if (!Array.isArray(findings)) findings = [];
