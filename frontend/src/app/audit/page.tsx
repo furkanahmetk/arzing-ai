@@ -132,6 +132,17 @@ export default function AuditPage() {
       const deploy = DeployUtil.makeDeploy(deployParams, transferDeployItem, payment);
       const deployJson = DeployUtil.deployToJson(deploy);
 
+      if ((window as any).csprclick) {
+        const csprAccount = (window as any).csprclick.getActiveAccount();
+        if (!csprAccount) {
+          try {
+            await (window as any).csprclick.connect('casper-wallet');
+          } catch (e) {
+            console.warn("csprclick connect failed", e);
+          }
+        }
+      }
+
       const sendResult = await (window as any).csprclick.send(deployJson, activeAccount.address);
       
       if (!sendResult || sendResult.cancelled || !sendResult.deployHash) {
