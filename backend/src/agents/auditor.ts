@@ -28,6 +28,7 @@ export interface AuditResult {
   upgradeableRisk?: string
   auditedAt: string
   onChainTxHash?: string
+  fullReportMarkdown?: string
 }
 
 export class AuditorAgent {

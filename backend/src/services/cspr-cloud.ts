@@ -159,10 +159,10 @@ export class CsprCloudService {
         const bidData = b.bid || b || {}
         const selfStakeStr = bidData.staked_amount || '0'
         const selfStake = BigInt(selfStakeStr)
-        const delegatorsStake = Object.values(bidData.delegators || {}).reduce(
+        const delegatorsStake = (Object.values(bidData.delegators || {}) as any[]).reduce(
           (acc: bigint, d: any) => acc + BigInt(d?.staked_amount || '0'),
           0n
-        )
+        ) as bigint
         const totalStake = (selfStake + delegatorsStake).toString()
 
         return {
