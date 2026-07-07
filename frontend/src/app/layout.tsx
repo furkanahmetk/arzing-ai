@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
-
+import CsprClickProvider from './providers/CsprClickProvider'
 
 export const metadata: Metadata = {
   title: 'CasperGuard AI — Autonomous Security & Network Intelligence',
@@ -22,7 +22,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="theme-color" content="#050b14" />
       </head>
       <body id="root">
-        {children}
+        <CsprClickProvider>
+          {children}
+        </CsprClickProvider>
       </body>
     </html>
   )

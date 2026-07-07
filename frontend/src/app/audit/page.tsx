@@ -132,67 +132,25 @@ export default function AuditPage() {
       let deploy = DeployUtil.makeDeploy(deployParams, transferDeployItem, payment);
       const deployJson = DeployUtil.deployToJson(deploy);
 
-      const CasperWalletProvider = (window as any).CasperWalletProvider;
-      if (!CasperWalletProvider) throw new Error("Casper Wallet not found.");
-      const provider = CasperWalletProvider();
-
-      let sigRes: any = null;
-      try {
-        sigRes = await provider.sign(JSON.stringify(deployJson), activeAccount.address);
-      } catch (e: any) {
-        throw new Error(`Payment signature failed: ${e?.message || JSON.stringify(e) || 'Unknown Error'}`);
+      if ((window as any).csprclick) {
+        const csprAccount = (window as any).csprclick.getActiveAccount();
+        if (!csprAccount) {
+          try {
+            await (window as any).csprclick.connect('casper-wallet');
+          } catch (e) {
+            console.warn("csprclick connect failed", e);
+          }
+        }
       }
 
-      if (!sigRes || sigRes.cancelled || sigRes.isCancelled) {
+      const sendResult = await (window as any).csprclick.send(deployJson, activeAccount.address);
+      
+      if (!sendResult || sendResult.cancelled || !sendResult.deployHash) {
         throw new Error("Transaction was cancelled by user.");
       }
-      
-      const toHexString = (bytes: Uint8Array | string | number[]) => {
-        if (!bytes) return '';
-        if (typeof bytes === 'string') return bytes;
-        return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-      };
 
-      const fromHexString = (hexString: string) => {
-        const bytes = new Uint8Array(hexString.length / 2);
-        for (let i = 0; i < hexString.length; i += 2) {
-          bytes[i / 2] = parseInt(hexString.substring(i, i + 2), 16);
-        }
-        return bytes;
-      };
-
-      let signatureBytes: Uint8Array;
-      if (sigRes.signature instanceof Uint8Array) {
-        signatureBytes = sigRes.signature;
-      } else {
-        const hexStr = typeof sigRes.signature === 'string' ? sigRes.signature : (sigRes.signatureHex || toHexString(sigRes.signature));
-        signatureBytes = fromHexString(hexStr);
-      }
-
-      deploy = DeployUtil.setSignature(
-        deploy,
-        signatureBytes,
-        CLPublicKey.fromHex(activeAccount.address)
-      );
-
-      logs.push(`⏳ Broadcasting transaction to Casper Testnet...`);
-      setLogs([...logs]);
-
-      const { CasperServiceByJsonRPC } = require('casper-js-sdk');
-      const client = new CasperServiceByJsonRPC('https://rpc.testnet.casperlabs.io/rpc');
-      let deployHash: string = '';
-      try {
-        deployHash = await client.putDeploy(deploy);
-      } catch (e: any) {
-        console.error("RPC PutDeploy Error:", e);
-        // Fallback to signature hash if network rejects it so UI doesn't completely block MVP
-        deployHash = toHexString(signatureBytes).substring(0, 64);
-        logs.push(`⚠️ RPC Broadcast failed. Using signature hash fallback: ${deployHash.substring(0, 16)}...`);
-      }
-
-      if (deployHash && !deployHash.includes('mock')) {
-        logs.push(`✅ User: Real Fee transaction broadcasted! TX: ${deployHash.substring(0, 16)}...`);
-      }
+      const deployHash = sendResult.deployHash;
+      logs.push(`✅ User: Real Fee transaction broadcasted! TX: ${deployHash.substring(0, 16)}...`);
       setLogs([...logs]);
 
       const res = await fetch(`${BACKEND}/api/audit`, {
