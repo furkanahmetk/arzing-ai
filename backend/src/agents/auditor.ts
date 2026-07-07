@@ -8,6 +8,8 @@ import { RiskScorer } from '../analysis/risk-scorer'
 import { RustAnalyzer } from '../analysis/rust-analyzer'
 import { CsprCloudService } from '../services/cspr-cloud'
 import { logger } from '../index'
+import { CasperServiceByJsonRPC, Keys, DeployUtil, CLPublicKey } from 'casper-js-sdk'
+import fs from 'fs'
 
 export interface AuditFinding {
   severity: 'critical' | 'high' | 'medium' | 'low' | 'info'
@@ -88,8 +90,8 @@ export class AuditorAgent {
     const onChainTxHash = await this.writeOnChain(target, riskScore, allFindings).catch(() => undefined)
     if (onChainTxHash) logs.push(`✅ Agent: Successfully logged to blockchain. TxHash: ${onChainTxHash.substring(0,8)}...`)
 
-    const actualSpend = Math.max(10, estimatedFee * (0.5 + Math.random() * 0.2)); // Simulate 50-70% of estimated fee being actually spent on LLM
-    const margin = actualSpend * 0.3;
+    const actualSpend = 10.0 + Math.random() * 10.0; // Simulate 10-20 CSPR
+    const margin = actualSpend * 1.0; // 100% Margin
     const totalCost = actualSpend + margin;
     let refunded = 0;
     let refundTxHash: string | undefined = undefined;
@@ -135,7 +137,7 @@ ${findingsMd}
 ## 4. Financial Summary (x402 Micropayment)
 - **Collected Maximum Budget:** ${estimatedFee.toFixed(2)} CSPR
 - **Actual Agent Spend (LLM + Node):** ${actualSpend.toFixed(2)} CSPR
-- **Platform Margin (30%):** ${margin.toFixed(2)} CSPR
+- **Platform Margin (100%):** ${margin.toFixed(2)} CSPR
 - **Refunded to User:** ${refunded > 0 ? refunded.toFixed(2) : '0'} CSPR
 
 ## 5. On-Chain Transparency (Hashes)
@@ -179,15 +181,46 @@ ${x402Receipt ? `- **x402 Payment Proof:** \`${x402Receipt}\`\n` : ''}
     return result
   }
 
-  private async triggerRefund(userAddress: string, amount: number): Promise<string> {
-    // In a full production environment, this would use the Agent's private key to sign a Transfer deploy
-    // For this MVP, we simulate the Casper Network response time and generate a mock deploy hash
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const hash = '01' + Array.from({length: 62}, () => Math.floor(Math.random() * 16).toString(16)).join('');
-        resolve(hash);
-      }, 1500);
-    });
+  private async triggerRefund(userAddressHex: string, amount: number): Promise<string> {
+    try {
+      const privateKeyPath = process.env.AGENT_PRIVATE_KEY || './keys/secret_key.pem';
+      if (!fs.existsSync(privateKeyPath)) {
+        logger.error(`[Refund] Private key not found at ${privateKeyPath}`);
+        throw new Error('Agent wallet not configured');
+      }
+
+      const agentKeyPair = Keys.Ed25519.loadKeyPairFromPrivateFile(privateKeyPath);
+      const amountInMotes = (Math.floor(amount * 1_000_000_000)).toString();
+      const id = Math.round(Math.random() * 100000);
+      const toPublicKey = CLPublicKey.fromHex(userAddressHex);
+      const paymentAmount = 100_000_000; // 0.1 CSPR gas
+
+      const casperService = new CasperServiceByJsonRPC(process.env.CASPER_NODE_URL || 'https://node.testnet.casper.network');
+      
+      const deployParams = new DeployUtil.DeployParams(
+        agentKeyPair.publicKey,
+        process.env.CASPER_NETWORK_NAME || 'casper-test',
+        1,
+        1800000
+      );
+
+      const session = DeployUtil.ExecutableDeployItem.newTransfer(
+        amountInMotes,
+        toPublicKey,
+        null,
+        id
+      );
+
+      const payment = DeployUtil.standardPayment(paymentAmount);
+      let deploy = DeployUtil.makeDeploy(deployParams, session, payment);
+      deploy = DeployUtil.signDeploy(deploy, agentKeyPair);
+
+      const deployResult = await casperService.deploy(deploy);
+      return deployResult.deploy_hash;
+    } catch (error: any) {
+      logger.error(`[Refund] Failed to broadcast refund: ${error.message}`);
+      throw error;
+    }
   }
 
   private async fetchSource(target: string): Promise<{ code: string; contractType: string }> {

@@ -2,6 +2,14 @@
 
 This guide covers how to deploy the **CasperGuard AI** stack to a production environment.
 
+## 0. Local Development (Quickstart)
+If you just want to run the project locally for testing or the Buildathon demo, simply use the provided `Makefile` at the root of the project:
+```bash
+make install
+make dev
+```
+*(Ensure `.env` files are configured before running `make dev`)*
+
 ## 1. Smart Contract Deployment (Casper Testnet)
 
 The on-chain registry component is built with Rust and the **Odra Framework**.

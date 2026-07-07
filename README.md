@@ -43,7 +43,8 @@ To ensure absolute transparency and auditability, the core smart contracts and a
 | Component | Hash / Public Key |
 | :--- | :--- |
 | **Audit Registry Contract** | `hash-0fac2940d2669bb4291e6603c8ea10fbd5181f8c29fb0c19077b91c08946344c` |
-| **Agent Master Wallet** | `019c347ac8fb0817aa856a85131ab08efa9366ea98d59dd3578fc52ed7826fc042` |
+| **Contract Deployer Wallet**| `019c347ac8fb0817aa856a85131ab08efa9366ea98d59dd3578fc52ed7826fc042` |
+| **Agent Master Wallet** | `01E9Cf4E14c9c39D8690c1C0f495eb540370D9C1f786e0D16a0BD11e594b3D96c2` |
 
 > You can view all agent transactions, fee collections, and user refunds natively on [cspr.live/testnet](https://testnet.cspr.live).
 
@@ -75,6 +76,26 @@ Everything you need to understand, deploy, and monetize CasperGuard AI is fully 
 - Casper Wallet browser extension (Testnet connected)
 
 ### Setup
+We provide two ways to run the project locally: using a quick `Makefile` or manually configuring each directory.
+
+#### Option A: Quickstart (Using Makefile)
+```bash
+# 1. Clone repository
+git clone https://github.com/yourusername/casperguard-ai.git
+cd casperguard-ai
+
+# 2. Configure Environment Variables
+cp backend/.env.example backend/.env 
+cp frontend/.env.example frontend/.env.local
+# (Add your OPENROUTER_API_KEY inside backend/.env)
+
+# 3. Install & Start
+make install
+make dev
+```
+*(The `make dev` command runs both the Next.js frontend and Express backend concurrently).*
+
+#### Option B: Manual Setup
 ```bash
 # 1. Clone repository
 git clone https://github.com/yourusername/casperguard-ai.git
@@ -92,6 +113,7 @@ npm install --legacy-peer-deps
 cp .env.example .env.local
 npm run dev
 ```
+
 Open `http://localhost:3000` to access the CasperGuard AI dashboard.
 
 ## 🛡️ License

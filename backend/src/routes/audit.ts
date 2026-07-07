@@ -12,13 +12,12 @@ auditRouter.post('/estimate-fee', async (req: Request, res: Response) => {
   const { target } = req.body
   if (!target) return res.status(400).json({ error: 'target is required' })
 
-  let complexity = 20 // Base complexity
-  if (target.includes('github.com')) complexity += 30 // GitHub repos take more context
+  let complexity = 30 // Base complexity
+  if (target.includes('github.com')) complexity += 20 // GitHub repos take more context
   else if (target.startsWith('hash-')) complexity += 10 // On-chain contracts
 
-  const baseLlmCost = complexity * 10 // Mock actual CSPR cost, e.g. 200-500 CSPR
-  const platformMargin = baseLlmCost * 0.3
-  const estimatedFeeCspr = Math.ceil(baseLlmCost + platformMargin) // Up to ~650 CSPR
+  // 5x Scaled Model for realistic monetization
+  const estimatedFeeCspr = complexity // 30, 40, or 50 CSPR
 
   res.json({
     target,
