@@ -113,27 +113,32 @@ export default function AuditPage() {
     try {
       logs.push(`💸 User: Requesting signature for ${feeEstimate.amount} CSPR Audit fee...`);
       setLogs([...logs]);
-      const CasperWalletProvider = (window as any).CasperWalletProvider;
-      if (!CasperWalletProvider) throw new Error("Casper Wallet not found.");
-      const provider = CasperWalletProvider();
+      const deployParams = new DeployUtil.DeployParams(
+        CLPublicKey.fromHex(activeAccount.address),
+        'casper-test',
+        1,
+        1800000 // 30 minutes TTL
+      );
 
-      let sigRes: any = null;
-      try {
-        sigRes = await provider.signMessage("Sign this message to authorize the Due Diligence Agent fee: " + feeEstimate.amount + " CSPR", activeAccount.address);
-      } catch (e: any) {
-        throw new Error('Payment signature rejected by user.');
-      }
+      const amount = feeEstimate.amount * 1_000_000_000;
+      const transferDeployItem = DeployUtil.ExecutableDeployItem.newTransfer(
+        amount,
+        CLPublicKey.fromHex(FEE_WALLET),
+        null,
+        1 // id
+      );
 
-      if (!sigRes || sigRes.cancelled || sigRes.isCancelled) {
+      const payment = DeployUtil.standardPayment(100_000_000); 
+      const deploy = DeployUtil.makeDeploy(deployParams, transferDeployItem, payment);
+      const deployJson = DeployUtil.deployToJson(deploy);
+
+      const sendResult = await (window as any).csprclick.send(deployJson, activeAccount.address);
+      
+      if (!sendResult || sendResult.cancelled || !sendResult.deployHash) {
         throw new Error("Transaction was cancelled by user.");
       }
-      
-      const toHexString = (bytes: Uint8Array | string | number[]) => {
-        if (typeof bytes === 'string') return bytes;
-        return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-      };
 
-      const deployHash = toHexString(sigRes.signature || sigRes.signatureHex || 'mock-tx-hash-' + Date.now());
+      const deployHash = sendResult.deployHash;
       logs.push(`✅ User: Fee transaction authorized! TX: ${deployHash.substring(0, 16)}...`);
       setLogs([...logs]);
 

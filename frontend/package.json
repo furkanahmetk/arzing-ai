@@ -12,7 +12,7 @@
     "@make-software/csprclick-core-client": "^1.11.0",
     "@make-software/csprclick-core-types": "^2.1.0",
     "@make-software/csprclick-ui": "^2.1.0",
-    "casper-js-sdk": "^5.0.12",
+    "casper-js-sdk": "^2.15.1",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
     "framer-motion": "^11.3.2",
