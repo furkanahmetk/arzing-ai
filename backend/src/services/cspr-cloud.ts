@@ -58,8 +58,10 @@ export class CsprCloudService {
     
     let activeValidators = 0;
     try {
-      const vRes = await cloudClient.get('/validators/active-count')
-      activeValidators = vRes.data?.data || 100
+      const auction = await rpc('state_get_auction_info')
+      if (auction?.auction_state?.era_validators?.[0]?.validator_weights) {
+        activeValidators = auction.auction_state.era_validators[0].validator_weights.length
+      }
     } catch (e) {
       activeValidators = status?.last_added_block_info?.era_id ? 100 : 0
     }

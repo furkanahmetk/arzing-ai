@@ -33,7 +33,7 @@ export default function ValidatorsPage() {
   const [selected, setSelected] = useState<Validator | null>(null)
 
   useEffect(() => {
-    fetch(`${BACKEND}/api/validators?limit=50`).then(r => r.json()).then(d => Array.isArray(d) && d.length && setValidators(d)).catch(() => {})
+    fetch(`${BACKEND}/api/validators?limit=1000`).then(r => r.json()).then(d => Array.isArray(d) && d.length && setValidators(d)).catch(() => {})
   }, [])
 
   const sorted = [...validators].sort((a, b) =>

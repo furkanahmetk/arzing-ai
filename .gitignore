@@ -12,3 +12,4 @@ casperguard.db*
 *.log
 backend/backend.log
 contracts/target/
+.next/
