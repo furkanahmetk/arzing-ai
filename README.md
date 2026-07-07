@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>🛡️ CasperGuard AI</h1>
+  <h1>🛡️ Arzing AI</h1>
   <p><strong>Autonomous Security & Network Intelligence for the Casper Network</strong></p>
   <p>
     <a href="https://casper.network"><img src="https://img.shields.io/badge/Network-Casper%20Testnet-red?style=for-the-badge&logo=casper" alt="Casper Network" /></a>
@@ -13,9 +13,9 @@
 
 ## 📖 Overview
 
-**CasperGuard AI** is a fully autonomous AI security agent built on the Casper Network. It performs deep vulnerability audits on Rust/WASM smart contracts, monitors validator health, and logs immutable security reports on-chain. 
+**Arzing AI** is a fully autonomous AI security agent built on the Casper Network. It performs deep vulnerability audits on Rust/WASM smart contracts, monitors validator health, and logs immutable security reports on-chain. 
 
-Designed for the **Casper Agentic Buildathon 2026**, CasperGuard AI demonstrates the future of AI-driven blockchain interactions, utilizing **CSPR.cloud MCP** for real-time telemetry and **x402 Micropayments** for autonomous financial execution.
+Designed for the **Casper Agentic Buildathon 2026**, Arzing AI demonstrates the future of AI-driven blockchain interactions, utilizing **CSPR.cloud MCP** for real-time telemetry and **x402 Micropayments** for autonomous financial execution.
 
 ## 🌟 Key Features
 
@@ -38,7 +38,7 @@ Designed for the **Casper Agentic Buildathon 2026**, CasperGuard AI demonstrates
 
 ## 🚀 Live Testnet Deployments
 
-To ensure absolute transparency and auditability, the core smart contracts and agent wallets for CasperGuard AI are actively deployed on the **Casper Testnet**:
+To ensure absolute transparency and auditability, the core smart contracts and agent wallets for Arzing AI are actively deployed on the **Casper Testnet**:
 
 | Component | Hash / Public Key |
 | :--- | :--- |
@@ -50,7 +50,7 @@ To ensure absolute transparency and auditability, the core smart contracts and a
 
 ## 🏗️ Architecture
 
-CasperGuard AI operates through three decoupled layers:
+Arzing AI operates through three decoupled layers:
 1. **Frontend (Next.js):** The user interface and native Casper Wallet integration.
 2. **Backend Agent (Node.js):** The autonomous LLM orchestration layer and x402 Facilitator logic.
 3. **Smart Contracts (Rust/Odra):** The `AuditRegistry` contract that acts as the source of truth for all security findings.
@@ -59,7 +59,7 @@ CasperGuard AI operates through three decoupled layers:
 
 ## 📖 Documentation
 
-Everything you need to understand, deploy, and monetize CasperGuard AI is fully documented:
+Everything you need to understand, deploy, and monetize Arzing AI is fully documented:
 
 - 🚀 **[Deployment Guide](docs/DEPLOYMENT.md)** - How to deploy the frontend, backend, and smart contracts.
 - ⚙️ **[Architecture Overview](docs/ARCHITECTURE.md)** - How the AI Agent loop and MCPs work.
@@ -81,8 +81,8 @@ We provide two ways to run the project locally: using a quick `Makefile` or manu
 #### Option A: Quickstart (Using Makefile)
 ```bash
 # 1. Clone repository
-git clone https://github.com/yourusername/casperguard-ai.git
-cd casperguard-ai
+git clone https://github.com/furkanahmetk/arzing-ai.git
+cd arzing-ai
 
 # 2. Configure Environment Variables
 cp backend/.env.example backend/.env 
@@ -99,8 +99,8 @@ make dev
 #### Option B: Manual Setup
 ```bash
 # 1. Clone repository
-git clone https://github.com/yourusername/casperguard-ai.git
-cd casperguard-ai
+git clone https://github.com/furkanahmetk/arzing-ai.git
+cd arzing-ai
 
 # 2. Setup Backend Agent
 cd backend
@@ -116,7 +116,7 @@ cp .env.local.example .env.local
 npm run dev
 ```
 
-Open `http://localhost:3000` to access the CasperGuard AI dashboard.
+Open `http://localhost:3000` to access the Arzing AI dashboard.
 
 ## 🛡️ License
 MIT License. Built for the Casper Agentic Buildathon 2026.
