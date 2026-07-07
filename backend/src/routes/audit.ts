@@ -50,7 +50,8 @@ auditRouter.post('/', async (req: Request, res: Response) => {
 
   try {
     logger.info(`Audit requested for: ${target}`)
-    const result = await auditor.run(target, logs, deployHash, userAddress, estimatedFee)
+    const x402Receipt = req.x402Receipt; // Extract from middleware if present
+    const result = await auditor.run(target, logs, deployHash, userAddress, estimatedFee, x402Receipt)
 
     // Persist to DB
     db.saveAudit(result)

@@ -63,6 +63,7 @@ Everything you need to understand, deploy, and monetize CasperGuard AI is fully 
 - 🚀 **[Deployment Guide](docs/DEPLOYMENT.md)** - How to deploy the frontend, backend, and smart contracts.
 - ⚙️ **[Architecture Overview](docs/ARCHITECTURE.md)** - How the AI Agent loop and MCPs work.
 - 📜 **[Smart Contracts](docs/SMART_CONTRACTS.md)** - Deep dive into the Odra Framework integration.
+- 🤖 **[x402 Protocol Guide](docs/X402_INTEGRATION.md)** - How to use the M2M API for Agentic Commerce.
 - 💸 **[Monetization & x402](docs/MONETIZATION.md)** - Dynamic fee calculation, margin logic, and refunds.
 - 🎮 **[Usage Guide](docs/USAGE.md)** - How to use the Web UI and API.
 - 🎬 **[Demo Scenarios](docs/DEMO_SCENARIOS.md)** - Step-by-step test scenarios for judges.
