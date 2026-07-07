@@ -17,8 +17,8 @@ export function getLLM(opts: { temperature?: number } = {}) {
     configuration: {
       baseURL: "https://openrouter.ai/api/v1",
       defaultHeaders: {
-        "HTTP-Referer": "https://casperguard-ai.example.com",
-        "X-Title": "CasperGuard AI",
+        "HTTP-Referer": "https://arzing-ai.example.com",
+        "X-Title": "Arzing AI",
       },
     },
   });

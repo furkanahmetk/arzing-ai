@@ -44,7 +44,7 @@ export async function x402Middleware(req: Request, res: Response, next: NextFunc
           amount: PRICE_MOTES,
           to: PAYMENT_ADDRESS,
           facilitator: FACILITATOR,
-          description: 'CasperGuard AI — Smart Contract Audit (0.5 CSPR)',
+          description: 'Arzing AI — Smart Contract Audit (0.5 CSPR)',
         },
       ],
     })
