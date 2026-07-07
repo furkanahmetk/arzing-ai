@@ -76,23 +76,34 @@ pm2 start dist/index.js --name "casperguard-agent"
 
 ---
 
-## 3. Frontend Deployment (Vercel)
+## 3. Frontend Deployment
 
-The frontend is a Next.js application that integrates with Casper Wallet.
+The frontend is a Next.js application that integrates with Casper Wallet. You can deploy it natively on your VPS alongside the backend, or use a managed service like Vercel.
 
-### 3.1 Push to GitHub
-Ensure your repository is pushed to GitHub. Do not commit `.env.local` files.
+### Option A: Native VPS Deployment (PM2)
+If you are deploying the backend on a VPS, you can also host the frontend on the same server to keep everything unified.
 
-### 3.2 Vercel Import
+1. **Configure Environment:**
+```bash
+cd casperguard-ai/frontend
+cp .env.local.example .env.local
+```
+Edit `.env.local` and ensure `NEXT_PUBLIC_BACKEND_URL` points to your backend (e.g., `http://your-server-ip:4000` or your domain).
+
+2. **Build and Run with PM2:**
+```bash
+npm install --legacy-peer-deps
+npm run build
+pm2 start npm --name "casperguard-frontend" -- run start
+```
+*(By default, this will run the frontend on port `3000`. You can configure a reverse proxy like **Nginx** to map port 80/443 to `3000` and `4000`)*.
+
+### Option B: Managed Deployment (Vercel)
 1. Go to [Vercel](https://vercel.com/) and click **Add New Project**.
 2. Select your `casperguard-ai` repository.
 3. Under **Framework Preset**, Next.js should be automatically selected.
 4. Set the **Root Directory** to `frontend`.
-
-### 3.3 Vercel Environment Variables
-Add the following variables in the Vercel dashboard:
-- `NEXT_PUBLIC_BACKEND_URL`: URL of your deployed backend (e.g., `https://api.casperguard.com`)
-- `NEXT_PUBLIC_NETWORK`: `casper-test`
-
-### 3.4 Deploy
-Click **Deploy**. Vercel will build and serve the application. Ensure `styled-components` version (`5.3.11`) is maintained in `package.json` to prevent Casper Wallet UI conflicts.
+5. Add Environment Variables:
+   - `NEXT_PUBLIC_BACKEND_URL`: URL of your deployed backend (e.g., `https://api.casperguard.com`)
+   - `NEXT_PUBLIC_CASPER_CHAIN_NAME`: `casper-test`
+6. Click **Deploy**. Vercel will build and serve the application. (Ensure `styled-components` version `5.3.11` is maintained in `package.json` to prevent Casper Wallet UI conflicts).

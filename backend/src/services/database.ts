@@ -98,7 +98,6 @@ class DatabaseService {
     const row = this.instance.prepare('SELECT data, updated_at FROM validators WHERE public_key = ?').get(publicKey) as { data: string, updated_at: string } | undefined
     if (!row) return null
     const parsed = JSON.parse(row.data)
-    parsed.evalUpdatedAt = row.updated_at
     return parsed
   }
 

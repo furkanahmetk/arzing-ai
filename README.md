@@ -86,8 +86,9 @@ cd casperguard-ai
 
 # 2. Configure Environment Variables
 cp backend/.env.example backend/.env 
-cp frontend/.env.example frontend/.env.local
-# (Add your OPENROUTER_API_KEY inside backend/.env)
+cp frontend/.env.local.example frontend/.env.local
+# (Add your OPENROUTER_API_KEY to backend/.env)
+# (Ensure NEXT_PUBLIC_BACKEND_URL in frontend/.env.local points to the backend)
 
 # 3. Install & Start
 make install
@@ -110,7 +111,8 @@ npm run dev
 # 3. Setup Frontend
 cd ../frontend
 npm install --legacy-peer-deps
-cp .env.example .env.local
+cp .env.local.example .env.local
+# Verify NEXT_PUBLIC_BACKEND_URL=http://localhost:4000 in .env.local
 npm run dev
 ```
 

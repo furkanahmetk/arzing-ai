@@ -18,6 +18,13 @@ build:
 start:
 	npx concurrently "cd backend && npm start" "cd frontend && npm start"
 
+# Deploy to production server using PM2
+deploy: build
+	npm install -g pm2
+	pm2 start "cd backend && npm start" --name "casperguard-backend"
+	pm2 start "cd frontend && npm start" --name "casperguard-frontend"
+	pm2 save
+
 # Clean node_modules
 clean:
 	rm -rf backend/node_modules frontend/node_modules
