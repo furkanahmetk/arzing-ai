@@ -1,71 +1,97 @@
-# 🛡️ CasperGuard AI
-
-> **Autonomous Smart Contract Security Auditor & Network Health Guardian for Casper Network**
-
-[![Casper AI Toolkit](https://img.shields.io/badge/Casper%20AI%20Toolkit-Powered-red?style=for-the-badge)](https://www.casper.network/ai)
-[![x402 Protocol](https://img.shields.io/badge/x402-Micropayments-blue?style=for-the-badge)](https://docs.cspr.cloud/x402-facilitator-api/reference)
-[![MCP Native](https://img.shields.io/badge/MCP-Native-green?style=for-the-badge)](https://docs.cspr.cloud/agentic-tools/mcp-server)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
-
-**CasperGuard AI** is an advanced, autonomous agentic security system built for the Casper ecosystem. It continuously audits smart contracts for vulnerabilities, monitors validator health in real-time, and detects network anomalies—all without human intervention. Designed for the Casper Agentic Buildathon 2026.
+<div align="center">
+  <h1>🛡️ CasperGuard AI</h1>
+  <p><strong>Autonomous Security & Network Intelligence for the Casper Network</strong></p>
+  <p>
+    <a href="https://casper.network"><img src="https://img.shields.io/badge/Network-Casper%20Testnet-red?style=for-the-badge&logo=casper" alt="Casper Network" /></a>
+    <a href="https://make.services/cspr-cloud"><img src="https://img.shields.io/badge/Powered%20By-CSPR.cloud-blue?style=for-the-badge" alt="CSPR.cloud" /></a>
+    <a href="#"><img src="https://img.shields.io/badge/Smart%20Contracts-Odra%20Framework-orange?style=for-the-badge" alt="Odra Framework" /></a>
+    <a href="#"><img src="https://img.shields.io/badge/Agent-x402%20Micropayments-green?style=for-the-badge" alt="x402" /></a>
+  </p>
+</div>
 
 ---
 
+## 📖 Overview
+
+**CasperGuard AI** is a fully autonomous AI security agent built on the Casper Network. It performs deep vulnerability audits on Rust/WASM smart contracts, monitors validator health, and logs immutable security reports on-chain. 
+
+Designed for the **Casper Agentic Buildathon 2026**, CasperGuard AI demonstrates the future of AI-driven blockchain interactions, utilizing **CSPR.cloud MCP** for real-time telemetry and **x402 Micropayments** for autonomous financial execution.
+
 ## 🌟 Key Features
 
-1. **AI-Powered Smart Contract Audits:** Automatically scans `.rs` files or Wasm binaries using Large Language Models (LLM) combined with static analysis rules.
-2. **On-Chain Audit Immutable Ledger:** Audit reports, risk scores, and identified vulnerabilities are permanently hashed and logged directly on the Casper Testnet via our native `AuditRegistry` smart contract.
-3. **Network Health Monitoring (Sentinel):** A background daemon that continuously analyzes network metrics (uptime, self-stake ratios, commission rates) via CSPR.cloud and flags malicious or failing validators.
-4. **Autonomous Machine-to-Machine Payments:** Fully implements the **x402 Protocol**, allowing autonomous agents to pay for audit API endpoints using CSPR microtransactions.
-5. **CSPR.click Integration:** Seamless wallet integration for decentralized app authentication.
+### 1. Autonomous Smart Contract Auditor 🤖
+- Uses advanced LLMs (Gemma-3-27B-IT, GPT-4o) combined with static Rust pattern analysis to find:
+  - Reentrancy attacks
+  - Integer Overflows/Underflows
+  - CEP-18 / CEP-78 standard violations
+  - Unsafe upgrade paths and authorization bypasses
+- Logs every audit report immutably on the Casper Network via the **AuditRegistry** smart contract.
+
+### 2. Native Casper Wallet & x402 Micropayments 💳
+- Fully integrated with the native **Casper Wallet** using real `TransferDeploy` (No mock message signing).
+- Calculates real-time dynamic service fees in CSPR based on LLM token costs and network data requirements.
+- Automatically initiates **On-Chain Refunds** for any unspent CSPR budget after the AI agent completes its analysis.
+
+### 3. CSPR.cloud Telemetry Integration 📡
+- Fetches real-time contract bytecode, ABIs, and deployment history natively via the **CSPR.cloud REST/Stream API**.
+- Monitors Casper Validators for uptime and risk profiling.
+
+## 🚀 Live Testnet Deployments
+
+To ensure absolute transparency and auditability, the core smart contracts and agent wallets for CasperGuard AI are actively deployed on the **Casper Testnet**:
+
+| Component | Hash / Public Key |
+| :--- | :--- |
+| **Audit Registry Contract** | `hash-0fac2940d2669bb4291e6603c8ea10fbd5181f8c29fb0c19077b91c08946344c` |
+| **Agent Master Wallet** | `019c347ac8fb0817aa856a85131ab08efa9366ea98d59dd3578fc52ed7826fc042` |
+
+> You can view all agent transactions, fee collections, and user refunds natively on [cspr.live/testnet](https://testnet.cspr.live).
 
 ## 🏗️ Architecture
 
-```mermaid
-graph TD
-    UI[Frontend: Next.js + CSPR.click] -->|HTTP Request| API[Backend: Node.js API]
-    API -->|x402 Payment Gate| X402[x402 Facilitator]
-    API -->|LLM Prompt| AI[OpenAI / Gemini]
-    API -->|Deploy Transaction| Contract[AuditRegistry Smart Contract]
-    
-    Sentinel[Network Sentinel Daemon] -->|Polls| CSPRCloud[CSPR.cloud API]
-    Sentinel -->|Alerts| DB[(Local SQLite DB)]
-    
-    Contract --> Casper[Casper Testnet (Condor)]
-```
+CasperGuard AI operates through three decoupled layers:
+1. **Frontend (Next.js):** The user interface and native Casper Wallet integration.
+2. **Backend Agent (Node.js):** The autonomous LLM orchestration layer and x402 Facilitator logic.
+3. **Smart Contracts (Rust/Odra):** The `AuditRegistry` contract that acts as the source of truth for all security findings.
 
-## 📚 Documentation Directory
+> 📚 For a deep dive into the architecture, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
-Explore the complete guide to using, deploying, and presenting CasperGuard AI:
+## 📖 Documentation
 
-- 📖 **[Usage Guide](docs/USAGE.md)**: How to navigate the UI, request audits, and monitor the network.
-- 🚀 **[Deployment Guide](docs/DEPLOYMENT.md)**: Step-by-step instructions for deploying the backend, frontend, and smart contract.
-- 🎭 **[Demo Scenarios](docs/DEMO_SCENARIOS.md)**: Ready-to-use scripts for pitching and demonstrating the product to hackathon judges.
-- 🔐 **[GitHub Setup (Open Source Guide)](docs/GITHUB_SETUP.md)**: How to safely push this project to a public repository without leaking private keys.
+Everything you need to understand, deploy, and monetize CasperGuard AI is fully documented:
 
-## 🚀 Quick Start (Local Development)
+- 🚀 **[Deployment Guide](docs/DEPLOYMENT.md)** - How to deploy the frontend, backend, and smart contracts.
+- ⚙️ **[Architecture Overview](docs/ARCHITECTURE.md)** - How the AI Agent loop and MCPs work.
+- 📜 **[Smart Contracts](docs/SMART_CONTRACTS.md)** - Deep dive into the Odra Framework integration.
+- 💸 **[Monetization & x402](docs/MONETIZATION.md)** - Dynamic fee calculation, margin logic, and refunds.
+- 🎮 **[Usage Guide](docs/USAGE.md)** - How to use the Web UI and API.
+- 🎬 **[Demo Scenarios](docs/DEMO_SCENARIOS.md)** - Step-by-step test scenarios for judges.
+
+## 🚀 Quickstart (Local Development)
 
 ### Prerequisites
-- Node.js 18+
-- Rust + `cargo`
-- Casper account with Testnet funds
+- Node.js 20+
+- Casper Wallet browser extension (Testnet connected)
 
-### 1. Start the Backend
+### Setup
 ```bash
+# 1. Clone repository
+git clone https://github.com/yourusername/casperguard-ai.git
+cd casperguard-ai
+
+# 2. Setup Backend Agent
 cd backend
 npm install
-cp .env.example .env # Add your API keys!
-npm run build
-npm start
-```
+cp .env.example .env # Configure OpenRouter/OpenAI API Keys
+npm run dev
 
-### 2. Start the Frontend
-```bash
-cd frontend
-npm install
+# 3. Setup Frontend
+cd ../frontend
+npm install --legacy-peer-deps
+cp .env.example .env.local
 npm run dev
 ```
-Open [http://localhost:3000](http://localhost:3000) to view the UI.
+Open `http://localhost:3000` to access the CasperGuard AI dashboard.
 
-## 📜 License
-This project is open-source and licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+## 🛡️ License
+MIT License. Built for the Casper Agentic Buildathon 2026.
