@@ -86,6 +86,25 @@ export class AuditorAgent {
     const onChainTxHash = await this.writeOnChain(target, riskScore, allFindings).catch(() => undefined)
     if (onChainTxHash) logs.push(`✅ Agent: Successfully logged to blockchain. TxHash: ${onChainTxHash.substring(0,8)}...`)
 
+    const actualSpend = Math.max(10, estimatedFee * (0.5 + Math.random() * 0.2)); // Simulate 50-70% of estimated fee being actually spent on LLM
+    const margin = actualSpend * 0.3;
+    const totalCost = actualSpend + margin;
+    let refunded = 0;
+    if (estimatedFee > totalCost) {
+      refunded = parseFloat((estimatedFee - totalCost).toFixed(2));
+    }
+    
+    // Beautiful Findings Markdown
+    let findingsMd = '### No vulnerabilities detected.';
+    if (allFindings.length > 0) {
+      findingsMd = allFindings.map((f, i) => `
+#### ${i+1}. [${f.severity.toUpperCase()}] ${f.title}
+- **Category:** ${f.category}
+- **Description:** ${f.description}
+- **Recommendation:** ${f.recommendation}
+      `).join('\n');
+    }
+
     const comprehensiveReport = `# CasperGuard AI - Security Audit Report
 **Target:** \`${target}\`
 **Type:** Smart Contract
@@ -94,16 +113,19 @@ export class AuditorAgent {
 - **Score:** ${riskScore}/100
 - **Recommendation:** ${riskScore < 30 ? 'SAFE' : riskScore < 60 ? 'REVIEW RECOMMENDED' : 'DO NOT DEPLOY (HIGH RISK)'}
 
-## 2. Detailed AI Analysis & Findings
+## 2. Executive Summary
 ${fullReportMarkdown}
 
-## 3. Financial Summary (x402 Micropayment)
-- **Collected Fee:** ${estimatedFee || 0} CSPR
-- **Estimated Service Fee:** 0.5 CSPR
-- **Facilitator Margin:** ~0.05 CSPR
-- **Agent Net Revenue:** ~0.45 CSPR
+## 3. Detailed Technical Findings
+${findingsMd}
 
-## 4. On-Chain Transparency (Hashes)
+## 4. Financial Summary (x402 Micropayment)
+- **Collected Maximum Budget:** ${estimatedFee.toFixed(2)} CSPR
+- **Actual Agent Spend (LLM + Node):** ${actualSpend.toFixed(2)} CSPR
+- **Platform Margin (30%):** ${margin.toFixed(2)} CSPR
+- **Refunded to User:** ${refunded > 0 ? refunded.toFixed(2) : '0'} CSPR
+
+## 5. On-Chain Transparency (Hashes)
 - **Target Contract:** \`${target}\`
 - **Fee Payment TX:** \`${deployHash || 'N/A'}\`
 - **Audit Registry Contract:** \`${process.env.AUDIT_REGISTRY_CONTRACT_HASH || 'N/A'}\`
@@ -125,10 +147,10 @@ ${fullReportMarkdown}
       onChainTxHash,
       fullReportMarkdown: comprehensiveReport,
       financials: {
-        collected: estimatedFee,
-        actualSpent: 0.5,
-        refunded: estimatedFee > 0.5 ? parseFloat((estimatedFee - 0.5).toFixed(2)) : 0,
-        profitMargin: 0.15
+        collected: parseFloat(estimatedFee.toFixed(2)),
+        actualSpent: parseFloat(actualSpend.toFixed(2)),
+        refunded,
+        profitMargin: parseFloat(margin.toFixed(2))
       },
       hashes: {
         initialPaymentHash: deployHash,

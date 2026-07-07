@@ -113,27 +113,6 @@ export default function AuditPage() {
     try {
       logs.push(`💸 User: Requesting signature for ${feeEstimate.amount} CSPR Audit fee...`);
       setLogs([...logs]);
-      
-      const deployParams = new DeployUtil.DeployParams(
-        CLPublicKey.fromHex(activeAccount.address),
-        'casper-test',
-        1,
-        1800000 // 30 minutes TTL
-      );
-
-      // feeEstimate.amount CSPR = feeEstimate.amount * 10^9 motes
-      const amount = feeEstimate.amount * 1_000_000_000;
-      const transferDeployItem = DeployUtil.ExecutableDeployItem.newTransfer(
-        amount,
-        CLPublicKey.fromHex(FEE_WALLET),
-        null,
-        1 // id
-      );
-
-      const payment = DeployUtil.standardPayment(100_000_000); 
-      const deploy = DeployUtil.makeDeploy(deployParams, transferDeployItem, payment);
-      const deployJson = DeployUtil.deployToJson(deploy);
-
       const CasperWalletProvider = (window as any).CasperWalletProvider;
       if (!CasperWalletProvider) throw new Error("Casper Wallet not found.");
       const provider = CasperWalletProvider();
