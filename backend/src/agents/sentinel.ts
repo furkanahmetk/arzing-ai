@@ -65,7 +65,18 @@ export class SentinelAgent {
       if (!isNaN(selfRatio) && selfRatio < 0.02) flags.push('LOW_SELF_STAKE')
 
       v.flags = flags
-      v.riskScore = this.computeRiskScore(v)
+      
+      // Preserve LLM evaluation cache
+      if (prev && prev.evalUpdatedAt && prev.riskReasoning !== 'Pending LLM Evaluation') {
+        v.riskScore = prev.riskScore
+        v.riskReasoning = prev.riskReasoning
+        v.evalUpdatedAt = prev.evalUpdatedAt
+      } else {
+        v.riskScore = this.computeRiskScore(v)
+        v.riskReasoning = prev?.riskReasoning || 'Pending LLM Evaluation'
+        if (prev?.evalUpdatedAt) v.evalUpdatedAt = prev.evalUpdatedAt
+      }
+      
       db.saveValidatorSnapshot(v)
     }
     logger.info(`[Sentinel] Scanned ${validators.length} validators`)
