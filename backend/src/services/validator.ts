@@ -1,6 +1,7 @@
 import { CsprCloudService } from './cspr-cloud'
 import { db } from './database'
 import fetch from 'node-fetch'
+import { getLLM } from '../llm/router'
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || ''
 const EVALUATION_INTERVAL_MS = 6 * 60 * 60 * 1000 // 6 hours
@@ -131,35 +132,38 @@ Metrics context: Uptime below 95% is risky. Commission 0-20% is normal, >50% is 
 Validators:
 ${JSON.stringify(payload, null, 2)}
 
-Respond strictly in JSON format containing an object where each key is the "publicKey" and the value is an object with exactly two fields: "score" (number) and "reasoning" (string, max 2 sentences).
-Example Output:
+Respond EXACTLY in this format:
+<JSON>
 {
   "01aa11...": { "score": 15, "reasoning": "High uptime and normal commission indicate strong reliability." },
   "01bb22...": { "score": 85, "reasoning": "Low uptime and extreme commission pose a high risk." }
 }
+</JSON>
 `
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [{ role: 'user', content: prompt }],
-        response_format: { type: 'json_object' }
-      })
-    })
 
-    if (!res.ok) throw new Error(`LLM Error: ${res.statusText}`)
-    const data = await res.json()
-    const content = data.choices[0].message.content
     try {
-      const parsed = JSON.parse(content)
-      return parsed
-    } catch (e) {
-      console.error('Failed to parse LLM batch JSON', content)
-      throw new Error('Failed to parse LLM response.')
+      const llm = getLLM();
+      const res = await llm.invoke([{ role: 'user', content: prompt }]);
+      let content = res.content.toString();
+
+      // Extract JSON using tags
+      const jsonMatch = content.match(/<JSON>\s*([\s\S]*?)\s*<\/JSON>/i);
+      if (jsonMatch) {
+          content = jsonMatch[1];
+      } else {
+          // Fallback parsing if LLM forgot tags
+          const firstBrace = content.indexOf('{');
+          const lastBrace = content.lastIndexOf('}');
+          if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+              content = content.substring(firstBrace, lastBrace + 1);
+          }
+      }
+
+      const parsed = JSON.parse(content);
+      return parsed;
+    } catch (e: any) {
+      console.error('[ValidatorService] Failed to parse LLM response', e.message);
+      throw new Error('Failed to parse LLM response.');
     }
   }
 
