@@ -33,7 +33,7 @@ export default function NetworkPage() {
     return () => clearInterval(iv)
   }, [])
 
-  const metrics = [
+  const metrics = health ? [
     { label: 'Current Era', value: `#${health.eraId}`, icon: '🔄', color: 'cyan' },
     { label: 'Block Height', value: health.blockHeight.toLocaleString(), icon: '📦', color: 'cyan' },
     { label: 'Active Validators', value: health.activeValidators, icon: '⚡', color: 'green' },
@@ -42,7 +42,7 @@ export default function NetworkPage() {
     { label: 'Pending Deploys', value: health.pendingDeploys, icon: '⏳', color: 'yellow' },
     { label: 'Anomalies Detected', value: health.anomaliesDetected, icon: '🚨', color: health.anomaliesDetected > 0 ? 'red' : 'green' },
     { label: 'Network Risk Score', value: health.networkRisk, icon: '🛡️', color: health.networkRisk < 30 ? 'green' : health.networkRisk < 60 ? 'yellow' : 'red' },
-  ]
+  ] : []
 
   if (!health) return <div style={{color:'white', padding:'50px', textAlign:'center'}}>Loading network intelligence...</div>
 

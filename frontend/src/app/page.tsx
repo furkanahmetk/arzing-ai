@@ -18,14 +18,7 @@ interface NetworkStats {
   threatLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
 }
 
-const DEMO_STATS: NetworkStats = {
-  networkRisk: 24,
-  activeValidators: 98,
-  auditedContracts: 17,
-  alertsToday: 3,
-  avgValidatorUptime: 99.2,
-  threatLevel: 'LOW',
-}
+
 
 const THREAT_META: Record<string, { label: string; color: string; cls: string }> = {
   LOW:      { label: 'LOW',      color: 'var(--accent-green)',  cls: 'safe' },
@@ -35,7 +28,7 @@ const THREAT_META: Record<string, { label: string; color: string; cls: string }>
 }
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<NetworkStats>(DEMO_STATS)
+  const [stats, setStats] = useState<NetworkStats | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -45,7 +38,7 @@ export default function DashboardPage() {
       .catch(() => setLoading(false))
   }, [])
 
-  const threat = THREAT_META[stats.threatLevel]
+  const threat = stats ? THREAT_META[stats.threatLevel] : THREAT_META.LOW
 
   return (
     <>
@@ -79,16 +72,18 @@ export default function DashboardPage() {
           {/* Live threat gauge */}
           <div className={`card ${styles.gaugeCard}`}>
             <p className="section-title">Network Threat Level</p>
-            <RiskGauge score={stats.networkRisk} loading={loading} />
-            <div className={styles.threatBadge}>
-              <span
-                className={`badge badge-${threat.cls}`}
-                style={{ fontSize: '0.9rem', padding: '8px 20px' }}
-              >
-                <span style={{ animation: 'blink 1.5s infinite' }}>●</span>
-                &nbsp;{threat.label}
-              </span>
-            </div>
+            <RiskGauge score={stats?.networkRisk || 0} loading={loading} />
+            {!loading && stats && (
+              <div className={styles.threatBadge}>
+                <span
+                  className={`badge badge-${threat.cls}`}
+                  style={{ fontSize: '0.9rem', padding: '8px 20px' }}
+                >
+                  <span style={{ animation: 'blink 1.5s infinite' }}>●</span>
+                  &nbsp;{threat.label}
+                </span>
+              </div>
+            )}
           </div>
         </section>
 
@@ -97,7 +92,7 @@ export default function DashboardPage() {
           <StatCard
             icon="🛡️"
             label="Contracts Audited"
-            value={stats.auditedContracts}
+            value={stats?.auditedContracts || 0}
             sub="on Casper Testnet"
             color="cyan"
             loading={loading}
@@ -105,7 +100,7 @@ export default function DashboardPage() {
           <StatCard
             icon="⚡"
             label="Active Validators"
-            value={stats.activeValidators}
+            value={stats?.activeValidators || 0}
             sub="monitored in real-time"
             color="green"
             loading={loading}
@@ -113,7 +108,7 @@ export default function DashboardPage() {
           <StatCard
             icon="📊"
             label="Avg. Uptime"
-            value={`${stats.avgValidatorUptime}%`}
+            value={`${stats?.avgValidatorUptime || 0}%`}
             sub="last 7 eras"
             color="cyan"
             loading={loading}
@@ -121,9 +116,9 @@ export default function DashboardPage() {
           <StatCard
             icon="🚨"
             label="Alerts Today"
-            value={stats.alertsToday}
+            value={stats?.alertsToday || 0}
             sub="anomalies detected"
-            color={stats.alertsToday > 5 ? 'red' : 'yellow'}
+            color={(stats?.alertsToday || 0) > 5 ? 'red' : 'yellow'}
             loading={loading}
           />
         </section>

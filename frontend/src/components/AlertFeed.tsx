@@ -13,26 +13,25 @@ interface Alert {
   source: 'contract' | 'validator' | 'network'
 }
 
-const DEMO_ALERTS: Alert[] = [
-  { id: '1', level: 'warn', title: 'Validator Downtime Detected', message: 'Validator 01abc… missed 3 consecutive blocks', timestamp: '2 min ago', source: 'validator' },
-  { id: '2', level: 'danger', title: 'Reentrancy Pattern Found', message: 'Contract hash-xyz exhibits recursive call risk', timestamp: '14 min ago', source: 'contract' },
-  { id: '3', level: 'info', title: 'Audit Complete', message: 'Contract hash-def scored 91/100 — Safe', timestamp: '31 min ago', source: 'contract' },
-  { id: '4', level: 'warn', title: 'High Commission Change', message: 'Validator 01def raised commission 2% → 8%', timestamp: '1 hr ago', source: 'validator' },
-  { id: '5', level: 'info', title: 'Network Healthy', message: 'All 98 validators reporting normal activity', timestamp: '2 hr ago', source: 'network' },
-]
-
 const LEVEL_ICON: Record<string, string> = { info: 'ℹ️', warn: '⚠️', danger: '🚨' }
 const SOURCE_ICON: Record<string, string> = { contract: '📋', validator: '⚡', network: '🌐' }
 
 export default function AlertFeed({ limit = 10 }: { limit?: number }) {
-  const [alerts, setAlerts] = useState<Alert[]>(DEMO_ALERTS)
+  const [alerts, setAlerts] = useState<Alert[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     fetch(`${BACKEND}/api/alerts?limit=${limit}`)
       .then(r => r.json())
-      .then(d => Array.isArray(d) && d.length && setAlerts(d))
-      .catch(() => {})
+      .then(d => {
+        if (Array.isArray(d)) setAlerts(d)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
   }, [limit])
+
+  if (loading) return <div style={{ opacity: 0.5 }}>Loading network intelligence feed...</div>
+  if (alerts.length === 0) return <div style={{ opacity: 0.5 }}>No anomalies detected recently.</div>
 
   return (
     <div className={styles.feed}>

@@ -27,6 +27,7 @@ interface AuditResult {
   upgradeableRisk?: string
   auditedAt: string
   onChainTxHash?: string
+  fullReportMarkdown?: string
 }
 
 const SEV_META: Record<string, { label: string; cls: string; icon: string }> = {
@@ -56,6 +57,24 @@ export default function AuditPage() {
   const [result, setResult] = useState<AuditResult | null>(null)
   const [error, setError] = useState('')
 
+  const toHexString = (bytes: Uint8Array | string) => {
+    if (typeof bytes === 'string') return bytes;
+    return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  const downloadReport = () => {
+    if (!result?.fullReportMarkdown) return
+    const blob = new Blob([result.fullReportMarkdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `audit-report-${result.contractAddress.substring(0, 16)}.md`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   async function runAudit() {
     if (!input.trim()) return
     setStatus('scanning')
@@ -70,17 +89,81 @@ export default function AuditPage() {
     }
 
     try {
-      const res = await fetch(`${BACKEND}/api/audit`, {
+      let headers: HeadersInit = { 'Content-Type': 'application/json' }
+      let res = await fetch(`${BACKEND}/api/audit`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ target: input.trim() }),
       })
-      if (!res.ok) throw new Error(await res.text())
+
+      if (res.status === 402) {
+        // x402 Payment Required
+        const { paymentRequirements } = await res.json()
+        setStatus('idle') // pause visual scanner
+        
+        const CasperWalletProvider = (window as any).CasperWalletProvider
+        if (!CasperWalletProvider) throw new Error('Casper Wallet extension is not installed.')
+        
+        const provider = CasperWalletProvider()
+
+        const isConnected = await provider.isConnected()
+        if (!isConnected) throw new Error('Please connect your Casper wallet to pay for the audit.')
+        
+        const activePublicKey = await provider.getActivePublicKey()
+        if (!activePublicKey) throw new Error('Please unlock your Casper wallet to pay for the audit.')
+
+        const payload = {
+          network: paymentRequirements.network,
+          scheme: paymentRequirements.scheme,
+          asset: paymentRequirements.asset,
+          amount: paymentRequirements.amount,
+          payee: paymentRequirements.payee || '019c347ac8fb0817aa856a85131ab08efa9366ea98d59dd3578fc52ed7826fc042',
+          timestamp: Date.now(),
+          nonce: Math.random().toString(36).substring(7)
+        }
+
+        const msgString = JSON.stringify(payload)
+        
+        let sigRes: any = null
+        try {
+          sigRes = await provider.signMessage(msgString, activePublicKey)
+        } catch (e: any) {
+          throw new Error('Payment signature rejected by user.')
+        }
+        
+        if (!sigRes || sigRes.cancelled || sigRes.isCancelled) throw new Error('Payment signature rejected by user.')
+
+        const finalPayload = {
+          payload,
+          signature: toHexString(sigRes.signature || sigRes.signatureHex || ''),
+          signer: activePublicKey
+        }
+
+        headers['X-Payment'] = btoa(JSON.stringify(finalPayload))
+        setStatus('scanning') // resume visual scanner
+
+        res = await fetch(`${BACKEND}/api/audit`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ target: input.trim() }),
+        })
+      }
+
+      if (!res.ok) {
+        const errorText = await res.text()
+        try {
+          const parsed = JSON.parse(errorText)
+          throw new Error(parsed.error || parsed.details || errorText)
+        } catch {
+          throw new Error(errorText)
+        }
+      }
+      
       const data: AuditResult = await res.json()
       setResult(data)
       setStatus('done')
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Audit failed')
+    } catch (e: any) {
+      setError(e.message || 'Audit failed')
       setStatus('error')
     }
   }
@@ -225,6 +308,23 @@ export default function AuditPage() {
                     <li key={i} className={styles.gasItem}>⚙️ {g}</li>
                   ))}
                 </ul>
+              </div>
+            )}
+
+            {/* Comprehensive MD Report */}
+            {result.fullReportMarkdown && (
+              <div className={`card ${styles.reportCard}`} style={{ marginTop: '24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <h2 className="section-title" style={{ margin: 0 }}>Comprehensive AI Report</h2>
+                  <button className="btn btn-outline" onClick={downloadReport}>
+                    ⬇️ Download Report (.md)
+                  </button>
+                </div>
+                <div style={{ background: 'rgba(0,0,0,0.3)', padding: '20px', borderRadius: '8px', overflowX: 'auto', maxHeight: '500px', overflowY: 'auto' }}>
+                  <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                    {result.fullReportMarkdown}
+                  </pre>
+                </div>
               </div>
             )}
           </div>

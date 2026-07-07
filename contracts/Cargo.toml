@@ -7,6 +7,10 @@ edition = "2021"
 casper-contract = "4.0.0"
 casper-types = "4.0.0"
 
+[[bin]]
+name = "audit_registry"
+path = "src/main.rs"
+
 [profile.release]
 codegen-units = 1
 lto = true

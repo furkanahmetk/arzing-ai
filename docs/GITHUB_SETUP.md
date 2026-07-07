@@ -1,12 +1,12 @@
 # 🔐 Open Source & GitHub Push Guide
 
-Since **CasperGuard AI** is participating in a public hackathon (Casper Agentic Buildathon), the repository must be open-sourced. However, the project handles real Private Keys (`.pem`) and API keys.
+Since **CasperGuard AI** is participating in a public hackathon (Casper Agentic Buildathon), you will likely need to push it to a new, empty GitHub repository. However, the project handles real Private Keys (`.pem`) and API keys.
 
 **Follow this guide strictly to ensure zero credentials are leaked when pushing to GitHub.**
 
 ## 1. Verify your `.gitignore`
 
-Before running `git add .`, verify that your `.gitignore` contains the following lines:
+Before running any git commands, verify that your `.gitignore` contains the following lines:
 
 ```gitignore
 # Keys — NEVER commit private keys!
@@ -27,42 +27,43 @@ keys/
 
 ## 2. Prepare Example `.env` files
 
-Since your real `.env` is ignored, developers cloning your repo won't know what variables to set.
-Ensure you provide a `.env.example` in the `backend/` directory:
+Since your real `.env` is ignored, developers cloning your repo won't know what variables to set. We have provided `.env.example` files in both the `backend/` and `frontend/` folders. Make sure these exist and do not contain your actual secrets.
 
-```env
-# backend/.env.example
-PORT=4000
-OPENAI_API_KEY=your_openai_key_here
-CASPER_NODE_URL=https://node.testnet.casper.network
-CASPER_NETWORK_NAME=casper-test
-CSPR_CLOUD_API_KEY=your_cspr_cloud_key
-AGENT_PRIVATE_KEY=/absolute/path/to/keys/secret_key.pem
-AGENT_PUBLIC_KEY=your_public_key_hex
-AUDIT_REGISTRY_CONTRACT_HASH=hash-...
-```
+## 3. Creating a New Repo and Pushing from Scratch
 
-## 3. Scrubbing Git History (If you made a mistake)
+If you haven't initialized git yet, or want to start completely fresh without any commit history, follow these exact steps in your terminal:
 
-If you accidentally committed `secret_key.pem` or `.env` locally BEFORE adding them to `.gitignore`, simply removing them now is **NOT ENOUGH** (they will remain in the git history).
-
-If this happened, you must reset your git repository:
 ```bash
-# Danger: This removes all git history and starts fresh
-rm -rf .git
+# 1. Initialize a brand new git repository
 git init
+
+# 2. Add all files (the .gitignore will automatically skip the keys and .env files)
 git add .
+
+# 3. Create your first commit
 git commit -m "Initial commit: CasperGuard AI Platform"
+
+# 4. Rename the default branch to 'main'
+git branch -M main
 ```
 
-## 4. Pushing to GitHub
+Now, go to **[GitHub.com](https://github.com/new)** and create a **New Repository**. Give it a name (e.g., `casperguard-ai`), leave it **Public**, and DO NOT initialize it with a README, .gitignore, or license (leave those unchecked).
 
-Once everything is scrubbed and ignored:
+Copy the repository URL (e.g., `https://github.com/YOUR_USERNAME/casperguard-ai.git`), then run the following in your terminal:
 
 ```bash
+# 5. Link your local project to the GitHub repo
 git remote add origin https://github.com/YOUR_USERNAME/casperguard-ai.git
-git branch -M main
+
+# 6. Push your code to GitHub
 git push -u origin main
 ```
 
-**Final Check:** Open your GitHub repository in the browser. Navigate to the `backend/` folder. If you see `.env` or `keys/secret_key.pem`, **DELETE THE REPOSITORY IMMEDIATELY**, revoke the leaked keys, and start over.
+## 4. Final Security Check 🚨
+
+Once the push is complete, open your GitHub repository in the browser.
+Navigate to:
+- The `backend/` folder: **Make sure `.env` IS NOT THERE.**
+- The `keys/` folder: **Make sure this folder DOES NOT EXIST or is completely empty on GitHub.**
+
+If you see `.env` or `keys/secret_key.pem` on GitHub, **DELETE THE REPOSITORY IMMEDIATELY**, revoke any leaked keys (API or Blockchain), and start over.

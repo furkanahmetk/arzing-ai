@@ -45,7 +45,7 @@ export class SentinelAgent {
       const flags: string[] = []
 
       // Flag: uptime dropped
-      if (v.uptime < 96) flags.push('UPTIME_DEGRADED')
+      if (v.uptime < 98) flags.push('UPTIME_DEGRADED')
 
       // Flag: commission hike
       if (prev && v.commission > prev.commission + 2) {
@@ -98,7 +98,7 @@ export class SentinelAgent {
     const prev = snapshots[1]
 
     // Detect sudden validator count drop
-    if (prev.activeValidators - latest.activeValidators > 5) {
+    if (prev.activeValidators - latest.activeValidators > 3) {
       db.saveAlert({
         id: `validator-drop-${Date.now()}`,
         level: 'danger',

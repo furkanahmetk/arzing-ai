@@ -35,12 +35,15 @@ class DatabaseService {
         summary TEXT,
         findings TEXT NOT NULL,
         on_chain_tx TEXT,
-        audited_at TEXT NOT NULL
+        audited_at TEXT NOT NULL,
+        full_report_markdown TEXT
       );
 
       CREATE TABLE IF NOT EXISTS validators (
         public_key TEXT PRIMARY KEY,
         data TEXT NOT NULL,
+        risk_score INTEGER,
+        risk_reasoning TEXT,
         updated_at TEXT NOT NULL
       );
 
@@ -64,15 +67,19 @@ class DatabaseService {
   // ── Audits ─────────────────────────────────────────────────────────────────
   saveAudit(result: AuditResult) {
     this.instance.prepare(`
-      INSERT INTO audits (contract_address, risk_score, summary, findings, on_chain_tx, audited_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(result.contractAddress, result.riskScore, result.summary, JSON.stringify(result.findings), result.onChainTxHash || null, result.auditedAt)
+      INSERT INTO audits (contract_address, risk_score, summary, findings, on_chain_tx, audited_at, full_report_markdown)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(result.contractAddress, result.riskScore, result.summary, JSON.stringify(result.findings), result.onChainTxHash || null, result.auditedAt, result.fullReportMarkdown || null)
   }
 
   getAudit(contractAddress: string): AuditResult | null {
     const row = this.instance.prepare('SELECT * FROM audits WHERE contract_address = ? ORDER BY id DESC LIMIT 1').get(contractAddress) as Record<string, unknown> | undefined
     if (!row) return null
-    return { ...(row as unknown as AuditResult), findings: JSON.parse(row.findings as string) }
+    return { 
+      ...(row as unknown as AuditResult), 
+      findings: JSON.parse(row.findings as string),
+      fullReportMarkdown: row.full_report_markdown as string | undefined
+    }
   }
 
   getRecentAudits(limit: number) {
@@ -84,12 +91,15 @@ class DatabaseService {
     this.instance.prepare(`
       INSERT OR REPLACE INTO validators (public_key, data, updated_at)
       VALUES (?, ?, ?)
-    `).run(v.publicKey, JSON.stringify(v), new Date().toISOString())
+    `).run(v.publicKey, JSON.stringify(v), v.evalUpdatedAt || new Date().toISOString())
   }
 
   getValidatorSnapshot(publicKey: string): ValidatorData | null {
-    const row = this.instance.prepare('SELECT data FROM validators WHERE public_key = ?').get(publicKey) as { data: string } | undefined
-    return row ? JSON.parse(row.data) : null
+    const row = this.instance.prepare('SELECT data, updated_at FROM validators WHERE public_key = ?').get(publicKey) as { data: string, updated_at: string } | undefined
+    if (!row) return null
+    const parsed = JSON.parse(row.data)
+    parsed.evalUpdatedAt = row.updated_at
+    return parsed
   }
 
   getAllValidators(limit: number, sort: string): ValidatorData[] {

@@ -10,6 +10,7 @@ interface Validator {
   publicKey: string
   name?: string
   riskScore: number
+  riskReasoning?: string
   uptime: number
   commission: number
   delegators: number
@@ -20,15 +21,7 @@ interface Validator {
   flags: string[]
 }
 
-const DEMO_VALIDATORS: Validator[] = [
-  { publicKey: '01aa11bb22cc33dd44ee55ff66aa77bb88cc99dd00ee11ff22aa33bb44cc55dd66', name: 'CasperLabs', riskScore: 8, uptime: 99.9, commission: 2, delegators: 1420, selfStake: '120M CSPR', totalStake: '980M CSPR', eraRewardsConsistency: 99, lastSeen: '1 min ago', flags: [] },
-  { publicKey: '01bb22cc33dd44ee55ff66aa77bb88cc99dd00ee11ff22aa33bb44cc55dd66ee77', name: 'Everstake', riskScore: 12, uptime: 99.7, commission: 3, delegators: 870, selfStake: '80M CSPR', totalStake: '650M CSPR', eraRewardsConsistency: 97, lastSeen: '2 min ago', flags: [] },
-  { publicKey: '01cc33dd44ee55ff66aa77bb88cc99dd00ee11ff22aa33bb44cc55dd66ee77ff88', riskScore: 34, uptime: 97.1, commission: 5, delegators: 320, selfStake: '20M CSPR', totalStake: '210M CSPR', eraRewardsConsistency: 88, lastSeen: '8 min ago', flags: ['UPTIME_DEGRADED'] },
-  { publicKey: '01dd44ee55ff66aa77bb88cc99dd00ee11ff22aa33bb44cc55dd66ee77ff88aa99', name: 'Figment', riskScore: 9, uptime: 99.8, commission: 2, delegators: 540, selfStake: '60M CSPR', totalStake: '440M CSPR', eraRewardsConsistency: 99, lastSeen: '1 min ago', flags: [] },
-  { publicKey: '01ee55ff66aa77bb88cc99dd00ee11ff22aa33bb44cc55dd66ee77ff88aa99bb00', riskScore: 61, uptime: 94.2, commission: 10, delegators: 180, selfStake: '8M CSPR', totalStake: '120M CSPR', eraRewardsConsistency: 72, lastSeen: '22 min ago', flags: ['HIGH_COMMISSION', 'UPTIME_DEGRADED'] },
-  { publicKey: '01ff66aa77bb88cc99dd00ee11ff22aa33bb44cc55dd66ee77ff88aa99bb00cc11', riskScore: 18, uptime: 99.1, commission: 4, delegators: 290, selfStake: '30M CSPR', totalStake: '280M CSPR', eraRewardsConsistency: 95, lastSeen: '3 min ago', flags: [] },
-  { publicKey: '01aa77bb88cc99dd00ee11ff22aa33bb44cc55dd66ee77ff88aa99bb00cc11dd22', riskScore: 77, uptime: 91.0, commission: 15, delegators: 90, selfStake: '5M CSPR', totalStake: '70M CSPR', eraRewardsConsistency: 61, lastSeen: '1 hr ago', flags: ['HIGH_COMMISSION', 'LOW_SELF_STAKE', 'REWARD_INCONSISTENT'] },
-]
+
 
 type SortKey = 'riskScore' | 'uptime' | 'commission' | 'delegators'
 
@@ -139,6 +132,16 @@ export default function ValidatorsPage() {
                 {selected.publicKey}
               </p>
               <RiskGauge score={selected.riskScore} size="sm" />
+              
+              {selected.riskReasoning && (
+                <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', borderLeft: `3px solid var(--accent-${riskCls(selected.riskScore)})` }}>
+                  <p className="section-title" style={{ fontSize: '0.75rem', marginBottom: '6px' }}>🤖 LLM Risk Reasoning</p>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
+                    {selected.riskReasoning}
+                  </p>
+                </div>
+              )}
+
               <div className={styles.divider} />
               <div className={styles.detailRows}>
                 {[
