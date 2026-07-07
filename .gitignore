@@ -17,6 +17,7 @@ build/
 # Ignore IDE files
 .vscode/
 .idea/
+.mcp.json
 
 # Ignore Mac OS files
 .DS_Store
