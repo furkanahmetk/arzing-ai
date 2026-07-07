@@ -1,335 +1,404 @@
-'use client'
-import { useState } from 'react'
-import Navbar from '@/components/Navbar'
-import RiskGauge from '@/components/RiskGauge'
-import styles from './page.module.css'
+'use client';
 
-const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000'
+import { useState, useEffect } from 'react';
+import Navbar from '@/components/Navbar';
+import RiskGauge from '@/components/RiskGauge';
+import styles from './page.module.css';
+// @ts-ignore
+import { DeployUtil, CLPublicKey } from 'casper-js-sdk';
 
-type AuditStatus = 'idle' | 'scanning' | 'done' | 'error'
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+const FEE_WALLET = process.env.NEXT_PUBLIC_FEE_WALLET_ADDRESS || '0163d8A06Bab82776ec0fA0b38F1306e4E6a944468609AdF5c0F8F5Ad592Ef5d63';
 
 interface Finding {
-  severity: 'critical' | 'high' | 'medium' | 'low' | 'info'
-  category: string
-  title: string
-  description: string
-  recommendation: string
+  severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
+  category: string;
+  title: string;
+  description: string;
+  recommendation: string;
 }
 
 interface AuditResult {
-  contractAddress: string
-  riskScore: number
-  summary: string
-  findings: Finding[]
-  gasOptimizations: string[]
-  cep18Compliant?: boolean
-  cep78Compliant?: boolean
-  upgradeableRisk?: string
-  auditedAt: string
-  onChainTxHash?: string
-  fullReportMarkdown?: string
+  score: number;
+  recommendation: string;
+  findings: Finding[];
+  financials?: {
+    collected?: number;
+    actualSpent?: number;
+    refunded?: number;
+    profitMargin?: number;
+  };
+  hashes?: {
+    initialPaymentHash?: string;
+    registryHash?: string;
+  };
+  fullReportMarkdown?: string;
 }
-
-const SEV_META: Record<string, { label: string; cls: string; icon: string }> = {
-  critical: { label: 'CRITICAL', cls: 'danger', icon: '🔴' },
-  high:     { label: 'HIGH',     cls: 'danger', icon: '🟠' },
-  medium:   { label: 'MEDIUM',   cls: 'warn',   icon: '🟡' },
-  low:      { label: 'LOW',      cls: 'info',   icon: '🔵' },
-  info:     { label: 'INFO',     cls: 'info',   icon: 'ℹ️'  },
-}
-
-const SCAN_STEPS = [
-  'Fetching contract bytecode from Casper network…',
-  'Decompiling WebAssembly module…',
-  'Running static analysis patterns (reentrancy, overflow, access control)…',
-  'Checking CEP-18 / CEP-78 standard compliance…',
-  'Analyzing upgrade authority and key weights…',
-  'Running cargo-audit dependency scan…',
-  'Scoring risk with AI model…',
-  'Writing audit record on-chain via Odra contract…',
-  'Done.',
-]
 
 export default function AuditPage() {
-  const [input, setInput] = useState('')
-  const [status, setStatus] = useState<AuditStatus>('idle')
-  const [step, setStep] = useState(0)
-  const [result, setResult] = useState<AuditResult | null>(null)
-  const [error, setError] = useState('')
+  const [url, setUrl] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [logs, setLogs] = useState<string[]>([]);
+  const [result, setResult] = useState<AuditResult | null>(null);
+  const [activeAccount, setActiveAccount] = useState<{ address: string, provider: string } | null>(null);
+  const [feeEstimate, setFeeEstimate] = useState<{ amount: number, message: string } | null>(null);
 
-  const toHexString = (bytes: Uint8Array | string) => {
-    if (typeof bytes === 'string') return bytes;
-    return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-  }
+  useEffect(() => {
+    const syncAccount = () => {
+      if (!(window as any).csprclick) return;
+      const account = (window as any).csprclick.getActiveAccount();
+      if (account?.public_key) {
+        setActiveAccount({
+          address: account.public_key,
+          provider: account.provider || 'connected wallet'
+        });
+      } else {
+        setActiveAccount(null);
+      }
+    };
 
-  const downloadReport = () => {
-    if (!result?.fullReportMarkdown) return
-    const blob = new Blob([result.fullReportMarkdown], { type: 'text/markdown' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `audit-report-${result.contractAddress.substring(0, 16)}.md`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  }
+    setTimeout(syncAccount, 500);
+    const interval = setInterval(syncAccount, 3000);
 
-  async function runAudit() {
-    if (!input.trim()) return
-    setStatus('scanning')
-    setStep(0)
-    setResult(null)
-    setError('')
+    return () => clearInterval(interval);
+  }, []);
 
-    // Animate steps
-    for (let i = 0; i < SCAN_STEPS.length - 1; i++) {
-      await new Promise(r => setTimeout(r, 900 + Math.random() * 600))
-      setStep(i + 1)
+  const estimateFee = async () => {
+    if (!activeAccount) {
+      alert("Please connect your Casper Wallet first!");
+      return;
     }
+    setLoading(true);
+    try {
+      const res = await fetch(`${BACKEND}/api/audit/estimate-fee`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target: url }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setFeeEstimate({ amount: data.estimatedFee, message: data.message });
+    } catch (err: any) {
+      alert(`Fee estimation failed: ${err.message}`);
+    }
+    setLoading(false);
+  };
+
+  const startInvestigation = async () => {
+    if (!activeAccount) {
+      alert("Please connect your Casper Wallet first!");
+      return;
+    }
+    if (!feeEstimate) return;
+
+    setLoading(true);
+    setLogs([]);
+    setResult(null);
 
     try {
-      let headers: HeadersInit = { 'Content-Type': 'application/json' }
-      let res = await fetch(`${BACKEND}/api/audit`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ target: input.trim() }),
-      })
+      logs.push(`💸 User: Requesting signature for ${feeEstimate.amount} CSPR Audit fee...`);
+      setLogs([...logs]);
+      
+      const deployParams = new DeployUtil.DeployParams(
+        CLPublicKey.fromHex(activeAccount.address),
+        'casper-test',
+        1,
+        1800000 // 30 minutes TTL
+      );
 
-      if (res.status === 402) {
-        // x402 Payment Required
-        const { paymentRequirements } = await res.json()
-        setStatus('idle') // pause visual scanner
-        
-        const CasperWalletProvider = (window as any).CasperWalletProvider
-        if (!CasperWalletProvider) throw new Error('Casper Wallet extension is not installed.')
-        
-        const provider = CasperWalletProvider()
+      // feeEstimate.amount CSPR = feeEstimate.amount * 10^9 motes
+      const amount = feeEstimate.amount * 1_000_000_000;
+      const transferDeployItem = DeployUtil.ExecutableDeployItem.newTransfer(
+        amount,
+        CLPublicKey.fromHex(FEE_WALLET),
+        null,
+        1 // id
+      );
 
-        const isConnected = await provider.isConnected()
-        if (!isConnected) throw new Error('Please connect your Casper wallet to pay for the audit.')
-        
-        const activePublicKey = await provider.getActivePublicKey()
-        if (!activePublicKey) throw new Error('Please unlock your Casper wallet to pay for the audit.')
+      const payment = DeployUtil.standardPayment(100_000_000); 
+      const deploy = DeployUtil.makeDeploy(deployParams, transferDeployItem, payment);
+      const deployJson = DeployUtil.deployToJson(deploy);
 
-        const payload = {
-          network: paymentRequirements.network,
-          scheme: paymentRequirements.scheme,
-          asset: paymentRequirements.asset,
-          amount: paymentRequirements.amount,
-          payee: paymentRequirements.payee || '019c347ac8fb0817aa856a85131ab08efa9366ea98d59dd3578fc52ed7826fc042',
-          timestamp: Date.now(),
-          nonce: Math.random().toString(36).substring(7)
-        }
-
-        const msgString = JSON.stringify(payload)
-        
-        let sigRes: any = null
-        try {
-          sigRes = await provider.signMessage(msgString, activePublicKey)
-        } catch (e: any) {
-          throw new Error('Payment signature rejected by user.')
-        }
-        
-        if (!sigRes || sigRes.cancelled || sigRes.isCancelled) throw new Error('Payment signature rejected by user.')
-
-        const finalPayload = {
-          payload,
-          signature: toHexString(sigRes.signature || sigRes.signatureHex || ''),
-          signer: activePublicKey
-        }
-
-        headers['X-Payment'] = btoa(JSON.stringify(finalPayload))
-        setStatus('scanning') // resume visual scanner
-
-        res = await fetch(`${BACKEND}/api/audit`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ target: input.trim() }),
-        })
-      }
-
-      if (!res.ok) {
-        const errorText = await res.text()
-        try {
-          const parsed = JSON.parse(errorText)
-          throw new Error(parsed.error || parsed.details || errorText)
-        } catch {
-          throw new Error(errorText)
-        }
+      const sendResult = await (window as any).csprclick.send(deployJson, activeAccount.address);
+      
+      if (!sendResult || !sendResult.deployHash) {
+        throw new Error("Transaction was cancelled or failed to send.");
       }
       
-      const data: AuditResult = await res.json()
-      setResult(data)
-      setStatus('done')
-    } catch (e: any) {
-      setError(e.message || 'Audit failed')
-      setStatus('error')
+      const deployHash = sendResult.deployHash;
+      logs.push(`✅ User: Fee transaction sent! DeployHash: ${deployHash}`);
+      setLogs([...logs]);
+
+      const res = await fetch(`${BACKEND}/api/audit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target: url, deployHash, userAddress: activeAccount.address, estimatedFee: feeEstimate.amount }),
+      });
+      
+      const data = await res.json();
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      // Render streaming logs
+      let currentLogs = [...logs];
+      for (let i = 0; i < data.logs.length; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 600));
+        currentLogs.push(data.logs[i]);
+        setLogs([...currentLogs]);
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      
+      // Map backend AuditResult to frontend representation
+      const backendRes = data.result;
+      setResult({
+        score: backendRes.riskScore,
+        recommendation: backendRes.riskScore < 30 ? 'SAFE' : backendRes.riskScore < 60 ? 'REVIEW RECOMMENDED' : 'DO NOT DEPLOY',
+        findings: backendRes.findings,
+        financials: backendRes.financials,
+        hashes: backendRes.hashes,
+        fullReportMarkdown: backendRes.fullReportMarkdown
+      });
+
+    } catch (err: any) {
+      logs.push(`❌ ERROR: ${err.message}`);
+      setLogs([...logs]);
     }
-  }
+
+    setLoading(false);
+  };
+
+  const getLogClass = (log: string): string => {
+    if (log.includes('Agent:')) return 'action';
+    if (log.includes('User:')) return 'thought';
+    if (log.includes('ERROR:')) return 'observation';
+    return 'system';
+  };
+
+  const downloadReport = () => {
+    if (!result?.fullReportMarkdown) return;
+    const blob = new Blob([result.fullReportMarkdown], { type: 'text/markdown' });
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = `casperguard-audit-${url.substring(0, 16)}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(blobUrl);
+  };
 
   return (
     <>
       <Navbar />
-      <main className={styles.main}>
-        <div className={styles.header}>
-          <h1 className={styles.title}>Smart Contract Auditor</h1>
-          <p className={styles.desc}>
-            Paste a Casper contract hash or GitHub repository URL. The AI agent will
-            scan for vulnerabilities, check standard compliance, and record the result
-            on-chain.
+      <main style={{ flex: 1, padding: '32px', maxWidth: '1200px', width: '100%', margin: '0 auto' }}>
+        
+        {/* Header */}
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+          <h1 style={{
+            fontSize: '36px', fontWeight: 800, marginBottom: '8px',
+            background: 'linear-gradient(135deg, var(--text-primary), var(--accent-cyan))',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          }}>
+            Smart Contract Auditor
+          </h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '15px', maxWidth: '600px', margin: '0 auto' }}>
+            Paste a Casper contract hash or GitHub repository URL. The AI agent will scan for vulnerabilities, check standard compliance, and record the result on-chain via x402.
           </p>
         </div>
 
-        {/* Input */}
-        <div className={`card ${styles.inputCard}`}>
-          <label className="section-title" htmlFor="audit-input">
-            Contract Hash or GitHub Repo URL
-          </label>
-          <div className={styles.inputRow}>
+        {/* Input Panel */}
+        <div className="card" style={{ padding: '24px', marginBottom: '24px', background: 'rgba(10, 14, 23, 0.8)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+            <span style={{ color: 'var(--accent-cyan)', fontSize: '14px', fontWeight: 600 }}>▸</span>
+            <h2 style={{ fontSize: '14px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', margin: 0 }}>
+              Target Specification
+            </h2>
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
             <input
-              id="audit-input"
               className="input"
-              placeholder="e.g. hash-0abc123… or https://github.com/org/repo"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && status !== 'scanning' && runAudit()}
-              disabled={status === 'scanning'}
+              style={{ flex: 1 }}
+              type="text"
+              placeholder="e.g. hash-0abc123... or https://github.com/org/repo"
+              value={url}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setUrl(e.target.value); setFeeEstimate(null); }}
             />
-            <button
-              className={`btn btn-primary ${styles.auditBtn}`}
-              onClick={runAudit}
-              disabled={status === 'scanning' || !input.trim()}
-              id="start-audit-btn"
-            >
-              {status === 'scanning' ? '⏳ Scanning…' : '🔍 Audit'}
-            </button>
           </div>
 
-          {/* x402 notice */}
-          <p className={styles.x402Note}>
-            ⚡ AI agents can call this endpoint autonomously via{' '}
-            <strong>x402 micropayments</strong> — 0.5 CSPR per audit
-          </p>
+          {feeEstimate && (
+            <div style={{ marginBottom: '16px', padding: '12px', background: 'rgba(0, 240, 255, 0.05)', borderRadius: '8px', border: '1px solid rgba(0, 240, 255, 0.2)', color: 'var(--text-primary)', fontSize: '13px' }}>
+              <div style={{ color: 'var(--accent-cyan)' }}>ℹ️ {feeEstimate.message}</div>
+            </div>
+          )}
+
+          <button
+            className="btn btn-primary"
+            style={{ width: '100%' }}
+            disabled={!url || loading}
+            onClick={feeEstimate ? startInvestigation : estimateFee}
+          >
+            {loading ? (
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                <span className={styles.pulseDot}></span>
+                Processing...
+              </span>
+            ) : feeEstimate ? (
+              `⚡ PAY ${feeEstimate.amount} CSPR & START`
+            ) : (
+              '⚡ ESTIMATE FEE'
+            )}
+          </button>
         </div>
 
-        {/* Scanning progress */}
-        {status === 'scanning' && (
-          <div className={`card ${styles.scanCard}`}>
-            <p className="section-title">🤖 AI Agent Running…</p>
-            <div className={styles.steps}>
-              {SCAN_STEPS.map((s, i) => (
-                <div key={i} className={`${styles.stepItem} ${i <= step ? styles.stepDone : styles.stepPending}`}>
-                  <span className={styles.stepIcon}>{i < step ? '✓' : i === step ? '⟳' : '○'}</span>
-                  <span>{s}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Two column layout */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
 
-        {/* Error */}
-        {status === 'error' && (
-          <div className={`card ${styles.errorCard}`}>
-            <span>🚨 {error || 'Audit failed — check backend connection'}</span>
-          </div>
-        )}
-
-        {/* Results */}
-        {status === 'done' && result && (
-          <div className={styles.results}>
-            {/* Score + summary */}
-            <div className={`card ${styles.scoreCard}`}>
-              <div className={styles.scoreLeft}>
-                <h2 className={styles.contractAddr}>{result.contractAddress}</h2>
-                <p className={styles.summary}>{result.summary}</p>
-                <div className={styles.tags}>
-                  {result.cep18Compliant && <span className="badge badge-safe">✓ CEP-18</span>}
-                  {result.cep78Compliant && <span className="badge badge-safe">✓ CEP-78</span>}
-                  {result.upgradeableRisk && (
-                    <span className="badge badge-warn">⚠ Upgradeable: {result.upgradeableRisk}</span>
-                  )}
-                </div>
-                {result.onChainTxHash && (
-                  <p className={styles.onChain}>
-                    On-chain record:{' '}
-                    <a
-                      href={`https://testnet.cspr.live/deploy/${result.onChainTxHash}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="glow-cyan"
-                    >
-                      {result.onChainTxHash.slice(0, 16)}…
-                    </a>
-                  </p>
-                )}
-                <p className={styles.auditedAt}>Audited at {result.auditedAt}</p>
-              </div>
-              <div className={styles.gaugeWrap}>
-                <p className="section-title" style={{ textAlign: 'center' }}>Risk Score</p>
-                <RiskGauge score={result.riskScore} />
-              </div>
+          {/* Live Agent Log */}
+          <div className="card" style={{ padding: '24px', minHeight: '350px', display: 'flex', flexDirection: 'column', background: 'rgba(10, 14, 23, 0.8)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+              <span style={{ color: 'var(--accent-cyan)', fontSize: '14px' }}>⬡</span>
+              <h2 style={{ fontSize: '14px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', margin: 0 }}>
+                Live Agent Log
+              </h2>
             </div>
 
-            {/* Findings */}
-            <div className={`card ${styles.findingsCard}`}>
-              <h2 className="section-title">Security Findings ({result.findings.length})</h2>
-              {result.findings.length === 0 ? (
-                <p className={styles.noFindings}>✅ No vulnerabilities found</p>
+            <div style={{
+              flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px',
+              background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '12px',
+            }}>
+              {logs.length === 0 ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', fontSize: '13px' }}>
+                  Waiting for agent initialization...
+                </div>
               ) : (
-                <div className={styles.findings}>
-                  {result.findings.map((f, i) => {
-                    const m = SEV_META[f.severity]
-                    return (
-                      <div key={i} className={`${styles.finding} ${styles[f.severity]}`}>
-                        <div className={styles.findingHeader}>
-                          <span>{m.icon}</span>
-                          <span className={`badge badge-${m.cls}`}>{m.label}</span>
-                          <span className={styles.findingCategory}>{f.category}</span>
-                          <strong>{f.title}</strong>
-                        </div>
-                        <p className={styles.findingDesc}>{f.description}</p>
-                        <div className={styles.findingRec}>
-                          💡 <em>{f.recommendation}</em>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
+                logs.map((log: string, idx: number) => (
+                  <div key={idx} style={{ padding: '6px', fontSize: '13px', borderLeft: log.includes('✅') ? '2px solid var(--accent-green)' : log.includes('⚠️') || log.includes('❌') ? '2px solid var(--accent-red)' : '2px solid var(--accent-cyan)', background: 'rgba(255,255,255,0.02)', margin: '2px 0' }}>
+                    <span style={{ opacity: 0.4, marginRight: '8px', fontSize: '11px' }}>
+                      {String(idx + 1).padStart(2, '0')}
+                    </span>
+                    {log}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Investigation Report */}
+          <div className="card" style={{ padding: '24px', minHeight: '350px', display: 'flex', flexDirection: 'column', background: 'rgba(10, 14, 23, 0.8)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ color: 'var(--accent-cyan)', fontSize: '14px' }}>◈</span>
+                  <h2 style={{ fontSize: '14px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase', margin: 0 }}>
+                    Audit Report
+                  </h2>
+              </div>
+              {result && (
+                <button 
+                  onClick={downloadReport}
+                  style={{ background: 'var(--accent-cyan)', color: '#000', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s' }}
+                >
+                  📥 DOWNLOAD REPORT (.MD)
+                </button>
               )}
             </div>
 
-            {/* Gas optimizations */}
-            {result.gasOptimizations.length > 0 && (
-              <div className={`card ${styles.gasCard}`}>
-                <h2 className="section-title">Gas Optimization Suggestions</h2>
-                <ul className={styles.gasList}>
-                  {result.gasOptimizations.map((g, i) => (
-                    <li key={i} className={styles.gasItem}>⚙️ {g}</li>
-                  ))}
-                </ul>
+            {!result ? (
+              <div style={{
+                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--text-muted)', fontSize: '13px', gap: '8px',
+              }}>
+                <span style={{ fontSize: '32px', opacity: 0.3 }}>◈</span>
+                <span>Awaiting agent analysis...</span>
               </div>
-            )}
-
-            {/* Comprehensive MD Report */}
-            {result.fullReportMarkdown && (
-              <div className={`card ${styles.reportCard}`} style={{ marginTop: '24px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <h2 className="section-title" style={{ margin: 0 }}>Comprehensive AI Report</h2>
-                  <button className="btn btn-outline" onClick={downloadReport}>
-                    ⬇️ Download Report (.md)
-                  </button>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '16px', borderRadius: '8px', background: 'rgba(0,0,0,0.2)' }}>
+                {/* Score */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                  <div style={{ width: '80px', height: '80px', borderRadius: '50%', border: '4px solid', borderColor: result.score < 30 ? 'var(--accent-green)' : result.score < 60 ? 'var(--accent-yellow)' : 'var(--accent-red)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', fontWeight: 'bold', color: result.score < 30 ? 'var(--accent-green)' : result.score < 60 ? 'var(--accent-yellow)' : 'var(--accent-red)' }}>
+                    {result.score}
+                  </div>
+                  <div>
+                    <span className={`badge`} style={{ background: result.score < 30 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: result.score < 30 ? 'var(--accent-green)' : 'var(--accent-red)', border: '1px solid currentColor' }}>
+                      {result.recommendation}
+                    </span>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '8px' }}>
+                      Security audit complete
+                    </p>
+                  </div>
                 </div>
-                <div style={{ background: 'rgba(0,0,0,0.3)', padding: '20px', borderRadius: '8px', overflowX: 'auto', maxHeight: '500px', overflowY: 'auto' }}>
-                  <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
-                    {result.fullReportMarkdown}
-                  </pre>
+
+                {/* Details grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div style={{
+                    background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '14px',
+                    borderLeft: '3px solid var(--accent-cyan)',
+                  }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>
+                      Financial Summary
+                    </div>
+                    {result.financials && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Collected Fee:</span>
+                          <span style={{ color: 'var(--text-primary)' }}>{result.financials.collected} CSPR</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Agent Spent:</span>
+                          <span style={{ color: 'var(--text-primary)' }}>{result.financials.actualSpent} CSPR</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '4px', marginTop: '2px' }}>
+                          <span>Refunded:</span>
+                          <span style={{ color: 'var(--accent-green)', fontWeight: 'bold' }}>{result.financials.refunded} CSPR</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{
+                    background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '14px',
+                    borderLeft: '3px solid var(--accent-green)',
+                  }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>
+                      On-Chain Transparency
+                    </div>
+                    {result.hashes && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '10px', color: 'var(--text-secondary)' }}>
+                        <div title={result.hashes.initialPaymentHash}>
+                          <span style={{ color: 'var(--text-muted)' }}>FEE TX:</span> {result.hashes.initialPaymentHash?.substring(0, 10)}...
+                        </div>
+                        <div title={result.hashes.registryHash}>
+                          <span style={{ color: 'var(--accent-green)' }}>LOG TX:</span> {result.hashes.registryHash?.substring(0, 10)}...
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Findings */}
+                <div style={{
+                  background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '14px',
+                  fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6,
+                  borderLeft: '3px solid var(--accent-yellow)', maxHeight: '150px', overflowY: 'auto'
+                }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px' }}>
+                    Key Findings ({result.findings?.length || 0})
+                  </div>
+                  <ul style={{ margin: 0, paddingLeft: '16px' }}>
+                    {result.findings?.slice(0,3).map((f: any, i: number) => (
+                      <li key={i}>{f.title}</li>
+                    ))}
+                    {result.findings?.length > 3 && <li>... and {result.findings.length - 3} more (Download Report to view all)</li>}
+                    {result.findings?.length === 0 && <li>No critical issues found.</li>}
+                  </ul>
                 </div>
               </div>
             )}
           </div>
-        )}
+        </div>
       </main>
     </>
-  )
+  );
 }

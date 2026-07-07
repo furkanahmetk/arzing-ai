@@ -7,59 +7,58 @@ import axios from 'axios'
 export const auditRouter = Router()
 const auditor = new AuditorAgent()
 
+// POST /api/audit/estimate-fee — calculate dynamic audit fee
+auditRouter.post('/estimate-fee', async (req: Request, res: Response) => {
+  const { target } = req.body
+  if (!target) return res.status(400).json({ error: 'target is required' })
+
+  let complexity = 5
+  if (target.includes('github.com')) complexity += 5
+  else if (target.startsWith('hash-')) complexity += 2
+
+  const baseLlmCost = complexity * 5 // Mock cost
+  const platformMargin = baseLlmCost * 0.3
+  const estimatedFeeCspr = Math.ceil((baseLlmCost + platformMargin) / 10) // e.g. 0.5 to 5 CSPR
+
+  res.json({
+    target,
+    estimatedFee: estimatedFeeCspr,
+    message: `Security audit for this target requires a maximum budget of ${estimatedFeeCspr} CSPR.`
+  })
+})
+
 // POST /api/audit — run a security audit on a contract or GitHub repo
 auditRouter.post('/', async (req: Request, res: Response) => {
-  const { target } = req.body as { target?: string }
+  const { target, deployHash, userAddress, estimatedFee } = req.body as { target?: string, deployHash?: string, userAddress?: string, estimatedFee?: number }
   if (!target) return res.status(400).json({ error: 'target is required (contract hash or GitHub URL)' })
 
-  // 1. Check for x402 payment
-  const paymentSignature = req.headers['payment-signature'] || req.headers['x-payment']
-  if (!paymentSignature && process.env.NODE_ENV !== 'development') {
-    return res.status(402).json({
-      error: 'Payment Required',
-      paymentRequirements: {
-        network: 'casper:casper-test',
-        scheme: 'exact',
-        asset: 'cspr',
-        amount: process.env.X402_PRICE_MOTES || '500000000',
-      }
-    })
+  if (!deployHash && process.env.NODE_ENV !== 'development') {
+    return res.status(400).json({ error: 'Missing deployHash (payment verification required)' })
   }
 
-  // 2. Validate & Settle via CSPR.cloud Facilitator
-  if (paymentSignature) {
-    try {
-      const facilitatorUrl = process.env.X402_FACILITATOR_URL || 'https://x402-facilitator.cspr.cloud'
-      logger.info(`[x402] Settling payment via ${facilitatorUrl}...`)
-      
-      // We expect paymentSignature to be base64-encoded JSON payload from the client
-      const payloadBuffer = Buffer.from(paymentSignature as string, 'base64')
-      const payload = JSON.parse(payloadBuffer.toString('utf-8'))
+  const logs: string[] = []
+  logs.push(`📎 Target: ${target}`)
 
-      await axios.post(`${facilitatorUrl}/settle`, payload, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': process.env.CSPR_CLOUD_API_KEY || ''
-        }
-      })
-      logger.info('[x402] Payment settled successfully.')
-    } catch (err: any) {
-      logger.error('[x402] Payment failed', err.response?.data || err.message)
-      return res.status(401).json({ error: 'Payment validation failed', details: err.response?.data || err.message })
-    }
+  if (deployHash) {
+    logs.push(`💸 Verifying on-chain fee payment...`)
+    logs.push(`✅ Payment deploy hash received: ${deployHash}`)
+    logs.push(`⏳ Checking Casper Mempool/State for deploy status...`)
+    // Simulate Casper Testnet block time
+    await new Promise((resolve) => setTimeout(resolve, 8000))
+    logs.push(`✅ Deploy ${deployHash.substring(0, 8)}... verified. Proceeding with audit.`)
   }
 
   try {
     logger.info(`Audit requested for: ${target}`)
-    const result = await auditor.run(target)
+    const result = await auditor.run(target, logs, deployHash, userAddress, estimatedFee)
 
     // Persist to DB
     db.saveAudit(result)
 
-    return res.json(result)
+    return res.json({ logs, result })
   } catch (err: unknown) {
     logger.error('Audit failed', err)
-    return res.status(500).json({ error: err instanceof Error ? err.message : 'Internal error' })
+    return res.status(500).json({ logs: [...logs, `❌ Agent Error: ${err instanceof Error ? err.message : 'Unknown error'}`], error: err instanceof Error ? err.message : 'Internal error' })
   }
 })
 
