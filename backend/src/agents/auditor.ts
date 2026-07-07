@@ -233,7 +233,19 @@ Respond strictly in JSON format containing an object with exactly two fields:
       const res = await llm.invoke([{ role: 'user', content: prompt }])
       
       let content = res.content.toString() || '{"findings":[], "markdownReport": "# Error\\nLLM returned empty"}'
-      content = content.replace(/^```json\s*/, '').replace(/```\s*$/, '').trim()
+      
+      // Robust JSON extraction to handle conversational prefixes
+      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (jsonMatch) {
+          content = jsonMatch[1];
+      } else {
+          const firstBrace = content.indexOf('{');
+          if (firstBrace !== -1) {
+              const lastBrace = content.lastIndexOf('}');
+              content = content.substring(firstBrace, lastBrace + 1);
+          }
+      }
+      
       const parsed = JSON.parse(content)
       
       let findings = []
@@ -244,10 +256,13 @@ Respond strictly in JSON format containing an object with exactly two fields:
       
       logs.push(`✅ Agent: LLM analysis successful.`)
       return { findings, markdownReport }
-    } catch (err) {
-      logs.push(`⚠️ Agent: LLM analysis failed. Check logs. Falling back to static.`)
+    } catch (err: any) {
+      logs.push(`⚠️ Agent: LLM analysis failed due to parsing/API error.`)
       logger.warn('[Auditor] LLM analysis failed, using static only', err)
-      return { findings: [], markdownReport: '# Analysis Error\n\nLLM analysis failed. Check logs.' }
+      return { 
+        findings: [], 
+        markdownReport: `# Analysis Error\n\nThe LLM agent encountered an error during deep analysis:\n\`\`\`\n${err?.message || 'Unknown JSON parsing or API failure.'}\n\`\`\`\n\n*Note: Static analysis was still performed.*` 
+      }
     }
   }
 
