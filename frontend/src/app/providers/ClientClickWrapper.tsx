@@ -13,7 +13,7 @@ export default function ClientClickWrapper({ children }: { children: ReactNode }
         options={{
           appName: process.env.NEXT_PUBLIC_CSPR_CLICK_APP_NAME || 'Sentinel AI',
           appId: process.env.NEXT_PUBLIC_CSPR_CLICK_APP_ID || 'csprclick-template',
-          providers: ['casper-wallet', 'ledger', 'casperdash', 'metamask-snap'],
+          providers: ['casper-wallet', 'ledger', 'metamask-snap'],
         }}
       >
         <ClickUI />

@@ -43,7 +43,7 @@ async function main() {
   logger.info('Sentinel Agent started')
 
   app.listen(PORT, () => {
-    logger.info(`CasperGuard AI backend running on http://localhost:${PORT}`)
+    logger.info(`Arzing AI backend running on http://localhost:${PORT}`)
   })
 }
 

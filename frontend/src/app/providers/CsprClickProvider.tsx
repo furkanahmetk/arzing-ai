@@ -32,7 +32,7 @@ export default function CsprClickProvider({ children }: { children: ReactNode })
           appName: process.env.NEXT_PUBLIC_CSPR_CLICK_APP_NAME || 'Sentinel AI',
           appId: process.env.NEXT_PUBLIC_CSPR_CLICK_APP_ID || 'csprclick-template',
           contentMode: 'iframe',
-          providers: ['casper-wallet', 'ledger', 'casperdash', 'metamask-snap'],
+          providers: ['casper-wallet', 'ledger', 'metamask-snap'],
         }}
       >
         <ClickUI />

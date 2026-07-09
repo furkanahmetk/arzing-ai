@@ -55,7 +55,7 @@ export default function DashboardPage() {
               <span className="glow-cyan">Guardian</span> for Casper
             </h1>
             <p className={styles.heroDesc}>
-              CasperGuard AI continuously audits smart contracts, monitors validator
+              Arzing AI continuously audits smart contracts, monitors validator
               health, and detects network anomalies — entirely on-chain, without
               human intervention.
             </p>

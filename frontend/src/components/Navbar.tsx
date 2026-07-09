@@ -81,7 +81,7 @@ export default function Navbar() {
         <Link href="/" className={styles.logo}>
           <span className={styles.logoIcon}>🛡️</span>
           <div>
-            <span className={styles.logoName}>CasperGuard</span>
+            <span className={styles.logoName}>Arzing</span>
             <span className={styles.logoAi}> AI</span>
             <div className={styles.logoBadge}>BETA · TESTNET</div>
           </div>
