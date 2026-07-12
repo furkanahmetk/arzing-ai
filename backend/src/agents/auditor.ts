@@ -8,7 +8,7 @@ import { RiskScorer } from '../analysis/risk-scorer'
 import { RustAnalyzer } from '../analysis/rust-analyzer'
 import { CsprCloudService } from '../services/cspr-cloud'
 import { logger } from '../index'
-import { CasperServiceByJsonRPC, Keys, DeployUtil, CLPublicKey } from 'casper-js-sdk'
+import { CasperServiceByJsonRPC, Keys, DeployUtil, CLPublicKey, RuntimeArgs, CLValueBuilder } from 'casper-js-sdk'
 import fs from 'fs'
 
 export interface AuditFinding {
@@ -403,32 +403,41 @@ Write a comprehensive, deep, and highly detailed markdown-formatted report conta
       let safeSummary = await this.generateSummary(target, riskScore, findings)
       safeSummary = safeSummary.replace(/'/g, "").replace(/"/g, "")
 
-      const cmd = `casper-client put-deploy \
-        --node-address ${nodeUrl}/rpc \
-        --chain-name ${chainName} \
-        --secret-key ${keyPath} \
-        --session-package-hash ${hash} \
-        --session-entry-point submit_audit \
-        --payment-amount 5000000000 \
-        --session-arg "contract_target:string='${target}'" \
-        --session-arg "risk_score:u8='${riskScore}'" \
-        --session-arg "summary:string='${safeSummary.substring(0, 100)}'" \
-        --session-arg "findings_critical:u8='${crit}'" \
-        --session-arg "findings_high:u8='${high}'" \
-        --session-arg "findings_medium:u8='${med}'" \
-        --session-arg "findings_low:u8='${low}'" \
-        --session-arg "audited_at_ms:u64='${Date.now()}'" \
-        --session-arg "audit_date:string='${new Date().toISOString()}'" \\
-        --session-arg "model:string='${process.env.OPENROUTER_MODEL || 'unknown'}'"`
-        
-      const { stdout } = await execAsync(cmd)
+      const agentKeyPair = Keys.Ed25519.loadKeyPairFromPrivateFile(keyPath)
+      const casperService = new CasperServiceByJsonRPC(nodeUrl)
       
-      // Strip casper-client warnings before parsing JSON
-      const jsonStart = stdout.indexOf('{')
-      const cleanStdout = jsonStart !== -1 ? stdout.substring(jsonStart) : stdout
+      const runtimeArgs = RuntimeArgs.fromMap({
+        contract_target: CLValueBuilder.string(target),
+        risk_score: CLValueBuilder.u8(riskScore),
+        summary: CLValueBuilder.string(safeSummary.substring(0, 100)),
+        findings_critical: CLValueBuilder.u8(crit),
+        findings_high: CLValueBuilder.u8(high),
+        findings_medium: CLValueBuilder.u8(med),
+        findings_low: CLValueBuilder.u8(low),
+        audited_at_ms: CLValueBuilder.u64(Date.now()),
+        audit_date: CLValueBuilder.string(new Date().toISOString())
+      })
+
+      // The contract hash might be prefixed with "hash-". Strip it for the SDK.
+      const contractHashAsByteArray = Uint8Array.from(Buffer.from(hash.replace('hash-', ''), 'hex'))
+
+      const deployParams = new DeployUtil.DeployParams(agentKeyPair.publicKey, chainName, 1, 1800000)
       
-      const parsed = JSON.parse(cleanStdout)
-      const deployHash = parsed.result?.deploy_hash || parsed.result?.transaction_hash
+      // Use newStoredVersionContractByHash for session-package-hash execution
+      const session = DeployUtil.ExecutableDeployItem.newStoredVersionContractByHash(
+        contractHashAsByteArray,
+        null, // version
+        'submit_audit',
+        runtimeArgs
+      )
+      
+      const payment = DeployUtil.standardPayment(5_000_000_000) // 5 CSPR
+      
+      let deploy = DeployUtil.makeDeploy(deployParams, session, payment)
+      deploy = DeployUtil.signDeploy(deploy, agentKeyPair)
+
+      const deployResult = await casperService.deploy(deploy)
+      const deployHash = deployResult.deploy_hash
       
       logger.info(`[Auditor] Successfully dispatched on-chain transaction: ${deployHash}`)
       return deployHash
