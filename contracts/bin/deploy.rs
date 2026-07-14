@@ -1,6 +1,6 @@
 use odra::prelude::*;
 use std::env;
-use casperguard_contracts::AuditRegistry;
+use casperguard_contracts::audit_registry::AuditRegistry;
 use odra::host::{Deployer, InstallConfig, NoArgs};
 use odra_casper_livenet_env;
 

@@ -17,7 +17,7 @@ The on-chain registry component is built with Rust and the **Odra Framework**.
 ### 1.1 Compile the Contract
 ```bash
 cd contracts
-cargo build --release --target wasm32-unknown-unknown
+cargo odra build
 ```
 
 ### 1.2 Deploy via Casper Client
@@ -28,22 +28,33 @@ casper-client put-deploy \
   --node-address https://node.testnet.casper.network/rpc \
   --chain-name casper-test \
   --secret-key ./keys/secret_key.pem \
-  --session-path ./target/wasm32-unknown-unknown/release/AuditRegistry.wasm \
-  --payment-amount 500000000000 \
+  --session-path ./wasm/AuditRegistry.wasm \
+  --payment-amount 300000000000 \
   --session-arg "odra_cfg_package_hash_key_name:string='casperguard_pkg'" \
   --session-arg "odra_cfg_allow_key_override:bool='true'" \
   --session-arg "odra_cfg_is_upgradable:bool='true'" \
-  --session-arg "odra_cfg_constructor:string='init'" \
-  --session-arg "odra_cfg_is_upgrade:bool='false'" \
-  --session-arg "odra_cfg_is_factory_upgrade:bool='false'"
+  --session-arg "odra_cfg_is_upgrade:bool='false'"
 ```
 
-### 1.3 Capture the Package Hash
-After the deploy is executed and finalized, check `cspr.live` for the deploy hash. You will need the resulting **Contract Package Hash** and **Contract Hash** to configure the backend.
+### 1.3 Authorize the Backend Agent
+You must set your backend wallet as the authorized agent to submit audits:
+```bash
+casper-client put-deploy \
+  --node-address https://node.testnet.casper.network/rpc \
+  --chain-name casper-test \
+  --secret-key ./keys/secret_key.pem \
+  --session-package-hash hash-YOUR_CONTRACT_PACKAGE_HASH \
+  --session-entry-point "set_agent" \
+  --payment-amount 5000000000 \
+  --session-arg "new_agent:key='account-hash-YOUR_BACKEND_ACCOUNT_HASH'"
+```
+
+### 1.4 Capture the Package Hash
+After the deploy is executed and finalized, check `cspr.live` for the deploy hash. You will need the resulting **Contract Package Hash** to configure the backend.
 
 Update `backend/.env` with the hash:
 ```env
-AUDIT_REGISTRY_CONTRACT_HASH=hash-YOUR_NEW_CONTRACT_HASH
+AUDIT_REGISTRY_CONTRACT_HASH=hash-YOUR_CONTRACT_PACKAGE_HASH
 ```
 
 ---
