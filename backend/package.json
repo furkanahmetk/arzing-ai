@@ -10,8 +10,9 @@
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
+    "@hono/node-server": "^2.0.12",
     "@langchain/openai": "^1.5.3",
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.15.0",
     "axios": "^1.7.3",
     "better-sqlite3": "^11.1.2",
     "casper-js-sdk": "^2.15.3",
@@ -19,9 +20,12 @@
     "dotenv": "^16.4.5",
     "eventsource": "^2.0.2",
     "express": "^4.19.2",
-    "node-cron": "^3.0.3",
+    "node-cron": "^4.0.0",
     "openai": "^4.53.0",
     "winston": "^3.13.1"
+  },
+  "overrides": {
+    "brace-expansion": ">=2.0.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",
