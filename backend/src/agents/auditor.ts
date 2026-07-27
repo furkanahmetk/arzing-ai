@@ -236,30 +236,32 @@ ${x402Receipt ? `- **x402 Payment Proof:** \`${x402Receipt}\`\n` : ''}
 
   private async fetchSource(target: string): Promise<{ code: string; contractType: string }> {
     let isGitHub = false;
-    let safeUrlObj: URL | null = null;
+    let githubPathname = '';
     try {
       const parsedUrl = new URL(target);
       if (parsedUrl.protocol === 'https:' && (parsedUrl.hostname === 'github.com' || parsedUrl.hostname === 'www.github.com')) {
         isGitHub = true;
-        let pathname = parsedUrl.pathname.replace('/blob/', '/').replace('/tree/', '/');
-        safeUrlObj = new URL(`https://raw.githubusercontent.com${pathname}`);
+        githubPathname = parsedUrl.pathname.replace('/blob/', '/').replace('/tree/', '/');
+        if (!githubPathname.startsWith('/')) githubPathname = '/' + githubPathname;
       }
     } catch {
       // Not a valid URL
     }
 
-    if (isGitHub && safeUrlObj) {
-      let rawUrl = safeUrlObj.toString()
+    if (isGitHub && githubPathname) {
+      // Hardcoding the baseURL prevents SSRF attacks by restricting requests exclusively to raw.githubusercontent.com
+      const githubAxios = axios.create({ baseURL: 'https://raw.githubusercontent.com' });
+      
       try {
-        const res = await axios.get(rawUrl, { timeout: 10000 })
+        const res = await githubAxios.get(githubPathname, { timeout: 10000 })
         return { code: res.data as string, contractType: 'github' }
       } catch (err: any) {
         // If it's a 404 (maybe it's a directory), try appending /src/lib.rs or /src/main.rs
-        if (err.response?.status === 404 && !rawUrl.endsWith('.rs')) {
-          const baseUrl = rawUrl.endsWith('/') ? rawUrl.slice(0, -1) : rawUrl;
+        if (err.response?.status === 404 && !githubPathname.endsWith('.rs')) {
+          const basePath = githubPathname.endsWith('/') ? githubPathname.slice(0, -1) : githubPathname;
           let codeStr = '';
           try {
-            const libRes = await axios.get(baseUrl + '/src/lib.rs', { timeout: 5000 })
+            const libRes = await githubAxios.get(basePath + '/src/lib.rs', { timeout: 5000 })
             codeStr = libRes.data as string;
             
             // If lib.rs is just a small wrapper and points to a module, follow the module!
@@ -269,7 +271,7 @@ ${x402Receipt ? `- **x402 Payment Proof:** \`${x402Receipt}\`\n` : ''}
                 const modName = modMatch[1];
                 logger.info(`[Auditor] lib.rs is a wrapper. Automatically following pub mod: ${modName}`);
                 try {
-                   const modRes = await axios.get(baseUrl + `/src/${modName}.rs`, { timeout: 5000 });
+                   const modRes = await githubAxios.get(basePath + `/src/${modName}.rs`, { timeout: 5000 });
                    codeStr = modRes.data as string;
                 } catch {
                    // Fallback to original lib.rs if module fetch fails
@@ -279,10 +281,10 @@ ${x402Receipt ? `- **x402 Payment Proof:** \`${x402Receipt}\`\n` : ''}
             return { code: codeStr, contractType: 'github' }
           } catch {
             try {
-              const mainRes = await axios.get(baseUrl + '/src/main.rs', { timeout: 5000 })
+              const mainRes = await githubAxios.get(basePath + '/src/main.rs', { timeout: 5000 })
               return { code: mainRes.data as string, contractType: 'github' }
             } catch {
-              throw new Error(`Failed to fetch GitHub source from directory: ${baseUrl}`)
+              throw new Error(`Failed to fetch GitHub source from directory: ${basePath}`)
             }
           }
         }
