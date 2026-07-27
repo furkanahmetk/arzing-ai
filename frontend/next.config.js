@@ -8,6 +8,10 @@ const nextConfig = {
     NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000',
     NEXT_PUBLIC_CASPER_NETWORK: process.env.NEXT_PUBLIC_CASPER_NETWORK || 'casper-test',
   },
+  compiler: {
+    styledComponents: true,
+  },
+  transpilePackages: ['@make-software/csprclick-ui', '@make-software/cspr-design'],
 }
 
 module.exports = nextConfig

@@ -19,7 +19,7 @@ export const logger = createLogger({
 const app = express()
 const PORT = Number(process.env.PORT) || 4000
 
-app.use(cors({ origin: '*' }))
+app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:3000' }))
 app.use(express.json())
 
 // ── Routes ──────────────────────────────────────────────────────────────────

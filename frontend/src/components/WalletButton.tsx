@@ -1,68 +1,70 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useClickRef } from '@make-software/csprclick-ui'
 import styles from './Navbar.module.css'
 
 export default function WalletButton() {
-  const clickRef = useClickRef()
   const [activeAccount, setActiveAccount] = useState<{ address: string, provider: string } | null>(null)
 
   useEffect(() => {
     const syncAccount = async () => {
-      if (!clickRef) return
+      const CasperWalletProvider = (window as any).CasperWalletProvider
+      if (!CasperWalletProvider) return
+      
+      const provider = CasperWalletProvider()
       try {
-        const account = await clickRef.getActiveAccount()
-        if (account?.public_key) {
-          setActiveAccount({
-            address: account.public_key,
-            provider: account.provider || 'connected wallet'
-          })
-        } else {
-          setActiveAccount(null)
+        const isConnected = await provider.isConnected()
+        if (isConnected) {
+          const address = await provider.getActivePublicKey()
+          if (address) {
+            setActiveAccount({
+              address: address,
+              provider: 'Casper Wallet'
+            })
+            return
+          }
         }
+        setActiveAccount(null)
       } catch (e) {
         setActiveAccount(null)
       }
     }
 
     setTimeout(syncAccount, 500)
-    window.addEventListener('csprclick:signed_in', syncAccount)
-    window.addEventListener('csprclick:switched_account', syncAccount)
-    window.addEventListener('csprclick:signed_out', syncAccount)
-    window.addEventListener('csprclick:disconnected', syncAccount)
-    window.addEventListener('csprclick:loaded', syncAccount)
+    window.addEventListener('casper-wallet:activeKeyChanged', syncAccount)
+    window.addEventListener('casper-wallet:disconnected', syncAccount)
+    window.addEventListener('casper-wallet:connected', syncAccount)
 
     return () => {
-      window.removeEventListener('csprclick:signed_in', syncAccount)
-      window.removeEventListener('csprclick:switched_account', syncAccount)
-      window.removeEventListener('csprclick:signed_out', syncAccount)
-      window.removeEventListener('csprclick:disconnected', syncAccount)
-      window.removeEventListener('csprclick:loaded', syncAccount)
+      window.removeEventListener('casper-wallet:activeKeyChanged', syncAccount)
+      window.removeEventListener('casper-wallet:disconnected', syncAccount)
+      window.removeEventListener('casper-wallet:connected', syncAccount)
     }
-  }, [clickRef])
+  }, [])
 
   const connectWallet = async () => {
-    if (clickRef) {
-      clickRef.signIn()
-    } else {
-      const casperlabs = (window as any).casperlabs
-      if (casperlabs) {
-        try {
-          await casperlabs.requestConnection()
-        } catch (e) {
-          console.error('Wallet connection failed', e)
-        }
-      } else {
-        // Fallback if neither works: Try clicking the floating UI if it exists
-        const btn = document.querySelector('.csprclick-button') as HTMLElement
-        if (btn) btn.click()
-        else alert('Casper Wallet SDK is loading, please try again in a moment.')
+    const CasperWalletProvider = (window as any).CasperWalletProvider
+    if (CasperWalletProvider) {
+      try {
+        const provider = CasperWalletProvider()
+        await provider.requestConnection()
+      } catch (e) {
+        console.error('Wallet connection failed', e)
       }
+    } else {
+      alert('Casper Wallet extension is not installed. Please install it to continue.')
     }
   }
 
-  const disconnectWallet = () => {
-    if (clickRef) clickRef.signOut()
+  const disconnectWallet = async () => {
+    const CasperWalletProvider = (window as any).CasperWalletProvider
+    if (CasperWalletProvider) {
+      try {
+        const provider = CasperWalletProvider()
+        await provider.disconnectFromSite()
+      } catch (e) {
+        console.error('Wallet disconnect failed', e)
+      }
+    }
     setActiveAccount(null)
   }
 

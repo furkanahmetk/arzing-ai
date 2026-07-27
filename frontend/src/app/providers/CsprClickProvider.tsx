@@ -1,29 +1,29 @@
 'use client';
 
 import { ReactNode, useEffect, useState } from 'react';
-import dynamic from 'next/dynamic';
 import { ThemeProvider } from 'styled-components';
-
-const ClickProvider: any = dynamic(
-  () => import('@make-software/csprclick-ui').then((mod) => mod.ClickProvider as any),
-  { ssr: false }
-);
-
-const ClickUI: any = dynamic(
-  () => import('@make-software/csprclick-ui').then((mod) => mod.ClickUI as any),
-  { ssr: false }
-);
 
 export default function CsprClickProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<any>({ mode: 'dark' });
+  const [ClickComponents, setClickComponents] = useState<any>(null);
 
   useEffect(() => {
     import('@make-software/csprclick-ui').then((mod) => {
       if (mod.CsprClickThemes?.dark) {
         setTheme(mod.CsprClickThemes.dark);
       }
+      setClickComponents({
+        ClickProvider: mod.ClickProvider,
+        ClickUI: mod.ClickUI
+      });
     });
   }, []);
+
+  if (!ClickComponents) {
+    return <>{children}</>;
+  }
+
+  const { ClickProvider, ClickUI } = ClickComponents;
 
   return (
     <ThemeProvider theme={theme}>

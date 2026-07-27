@@ -130,8 +130,14 @@ export class CsprCloudService {
 
   async getContractInfo(contractHash: string): Promise<ContractInfo | null> {
     try {
+      const cleanHash = contractHash.replace('hash-', '')
+      if (!/^[a-fA-F0-9]{64}$/.test(cleanHash)) {
+        logger.warn(`[CSPR.cloud] Invalid contract hash format: ${contractHash}`)
+        return null
+      }
+
       // Use CSPR.cloud to get contract info
-      const res = await cloudClient.get(`/contracts/${contractHash.replace('hash-', '')}`)
+      const res = await cloudClient.get(`/contracts/${cleanHash}`)
       const data = res.data?.data
       return { 
         contractHash, 

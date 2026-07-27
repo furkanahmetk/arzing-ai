@@ -5,7 +5,7 @@ import Navbar from '@/components/Navbar';
 import RiskGauge from '@/components/RiskGauge';
 import styles from './page.module.css';
 // @ts-ignore
-import { DeployUtil, CLPublicKey } from 'casper-js-sdk';
+import { DeployUtil, CLPublicKey, CasperServiceByJsonRPC } from 'casper-js-sdk';
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
 const FEE_WALLET = process.env.NEXT_PUBLIC_FEE_WALLET_ADDRESS || '0163d8A06Bab82776ec0fA0b38F1306e4E6a944468609AdF5c0F8F5Ad592Ef5d63';
@@ -132,24 +132,57 @@ export default function AuditPage() {
       let deploy = DeployUtil.makeDeploy(deployParams, transferDeployItem, payment);
       const deployJson = DeployUtil.deployToJson(deploy);
 
-      if ((window as any).csprclick) {
-        const csprAccount = (window as any).csprclick.getActiveAccount();
-        if (!csprAccount) {
-          try {
-            await (window as any).csprclick.connect('casper-wallet');
-          } catch (e) {
-            console.warn("csprclick connect failed", e);
-          }
-        }
-      }
+      let deployHash = '';
 
-      const sendResult = await (window as any).csprclick.send(deployJson, activeAccount.address);
+      // CSPR Click UI internally uses casper-js-sdk v5, which is incompatible with our v2 deploy builder.
+      // Therefore, we must bypass csprclick.send and use the underlying CasperWalletProvider directly.
+      // Ensure we only create the provider once to avoid MessageChannel conflicts in the extension
+      const CasperWalletProvider = (window as any).CasperWalletProvider;
+      if (!CasperWalletProvider) throw new Error("Casper Wallet extension not found.");
       
-      if (!sendResult || sendResult.cancelled || !sendResult.deployHash) {
-        throw new Error("Transaction was cancelled by user.");
+      const provider = CasperWalletProvider();
+      
+      // Casper Wallet expects the exact JSON output from DeployUtil.deployToJson, which includes the { deploy: { ... } } wrapper.
+      // Do NOT unwrap it, otherwise the wallet's internal parser fails to find `json.deploy.header` and throws `arg not valid`.
+      const signRes = await provider.sign(JSON.stringify(deployJson), activeAccount.address);
+      if (signRes.cancelled) throw new Error("Transaction was cancelled by user.");
+      
+      // Casper Wallet returns the raw cryptographic signature bytes
+      let sigBytes: Uint8Array;
+      if (signRes.signature instanceof Uint8Array) {
+        sigBytes = signRes.signature;
+      } else if (typeof signRes.signature === 'string') {
+        sigBytes = new Uint8Array(Buffer.from(signRes.signature, 'hex'));
+      } else {
+        sigBytes = Uint8Array.from(Object.values(signRes.signature));
       }
+      
+      // Attach the signature to our original v2 Deploy object
+      const signedDeploy = DeployUtil.setSignature(
+        deploy,
+        sigBytes,
+        CLPublicKey.fromHex(activeAccount.address)
+      );
+      
+      logs.push(`⏳ User: Signature received, broadcasting to Casper Network...`);
+      setLogs([...logs]);
 
-      const deployHash = sendResult.deployHash;
+      // Send the signed deploy to our own backend to broadcast it. 
+      // This bypasses browser CORS policies that block direct requests to public nodes.
+      const broadcastRes = await fetch('http://localhost:4000/api/audit/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          signedDeployJson: DeployUtil.deployToJson(signedDeploy)
+        })
+      });
+      
+      const broadcastData = await broadcastRes.json();
+      if (!broadcastRes.ok) {
+        throw new Error(broadcastData.error || 'Failed to broadcast transaction');
+      }
+      
+      deployHash = broadcastData.deployHash;
       logs.push(`✅ User: Real Fee transaction broadcasted! TX: ${deployHash.substring(0, 16)}...`);
       setLogs([...logs]);
 
@@ -187,7 +220,11 @@ export default function AuditPage() {
       });
 
     } catch (err: any) {
+      console.error(err);
       logs.push(`❌ ERROR: ${err.message}`);
+      if (err.stack) {
+        logs.push(`STACK: ${err.stack.split('\\n')[1]}`);
+      }
       setLogs([...logs]);
     }
 

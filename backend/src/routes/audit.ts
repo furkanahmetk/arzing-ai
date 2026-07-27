@@ -3,9 +3,30 @@ import { AuditorAgent } from '../agents/auditor'
 import { db } from '../services/database'
 import { logger } from '../index'
 import axios from 'axios'
+import { CasperServiceByJsonRPC, DeployUtil } from 'casper-js-sdk'
 
 export const auditRouter = Router()
 const auditor = new AuditorAgent()
+
+// POST /api/audit/broadcast — broadcast a signed deploy to bypass frontend CORS issues
+auditRouter.post('/broadcast', async (req: Request, res: Response) => {
+  const { signedDeployJson } = req.body
+  if (!signedDeployJson) return res.status(400).json({ error: 'signedDeployJson is required' })
+
+  try {
+    const NODE_URL = process.env.CASPER_NODE_URL || 'https://node.testnet.casper.network/rpc'
+    const rpcClient = new CasperServiceByJsonRPC(NODE_URL)
+    
+    // Parse the JSON back into a Deploy object and broadcast it
+    const deploy = DeployUtil.deployFromJson(signedDeployJson).unwrap()
+    const broadcastRes = await rpcClient.deploy(deploy)
+    
+    return res.json({ deployHash: broadcastRes.deploy_hash })
+  } catch (err: any) {
+    logger.error('Broadcast failed', err)
+    return res.status(500).json({ error: err.message || 'Broadcast failed' })
+  }
+})
 
 // POST /api/audit/estimate-fee — calculate dynamic audit fee
 auditRouter.post('/estimate-fee', async (req: Request, res: Response) => {
@@ -13,7 +34,17 @@ auditRouter.post('/estimate-fee', async (req: Request, res: Response) => {
   if (!target) return res.status(400).json({ error: 'target is required' })
 
   let complexity = 30 // Base complexity
-  if (target.includes('github.com')) complexity += 20 // GitHub repos take more context
+  let isGithub = false;
+  try {
+    const url = new URL(target)
+    if (url.hostname === 'github.com' || url.hostname === 'www.github.com') {
+      isGithub = true;
+    }
+  } catch {
+    // Ignore invalid URLs
+  }
+
+  if (isGithub) complexity += 20 // GitHub repos take more context
   else if (target.startsWith('hash-')) complexity += 10 // On-chain contracts
 
   // 5x Scaled Model for realistic monetization

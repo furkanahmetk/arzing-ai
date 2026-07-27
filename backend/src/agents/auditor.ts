@@ -223,26 +223,67 @@ ${x402Receipt ? `- **x402 Payment Proof:** \`${x402Receipt}\`\n` : ''}
     }
   }
 
+  private isValidExternalUrl(urlString: string): boolean {
+    try {
+      const url = new URL(urlString)
+      if (url.protocol !== 'https:') return false
+      if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '::1') return false
+      return true
+    } catch {
+      return false
+    }
+  }
+
   private async fetchSource(target: string): Promise<{ code: string; contractType: string }> {
-    // GitHub URL
-    if (target.startsWith('https://github.com')) {
-      let rawUrl = target
-        .replace('github.com', 'raw.githubusercontent.com')
-        .replace('/blob/', '/')
-        .replace('/tree/', '/')
-      
+    let isGitHub = false;
+    let safeUrlObj: URL | null = null;
+    try {
+      const parsedUrl = new URL(target);
+      if (parsedUrl.protocol === 'https:' && (parsedUrl.hostname === 'github.com' || parsedUrl.hostname === 'www.github.com')) {
+        isGitHub = true;
+        let pathname = parsedUrl.pathname.replace('/blob/', '/').replace('/tree/', '/');
+        safeUrlObj = new URL(`https://raw.githubusercontent.com${pathname}`);
+      }
+    } catch {
+      // Not a valid URL
+    }
+
+    if (isGitHub && safeUrlObj) {
+      let rawUrl = safeUrlObj.toString()
       try {
         const res = await axios.get(rawUrl, { timeout: 10000 })
         return { code: res.data as string, contractType: 'github' }
       } catch (err: any) {
         // If it's a 404 (maybe it's a directory), try appending /src/lib.rs or /src/main.rs
         if (err.response?.status === 404 && !rawUrl.endsWith('.rs')) {
+          const baseUrl = rawUrl.endsWith('/') ? rawUrl.slice(0, -1) : rawUrl;
+          let codeStr = '';
           try {
-            const libRes = await axios.get(rawUrl.replace(/\/$/, '') + '/src/lib.rs', { timeout: 5000 })
-            return { code: libRes.data as string, contractType: 'github' }
+            const libRes = await axios.get(baseUrl + '/src/lib.rs', { timeout: 5000 })
+            codeStr = libRes.data as string;
+            
+            // If lib.rs is just a small wrapper and points to a module, follow the module!
+            if (codeStr.split('\n').length < 20) {
+              const modMatch = codeStr.match(/pub\s+mod\s+([a-zA-Z0-9_]+);/);
+              if (modMatch && modMatch[1]) {
+                const modName = modMatch[1];
+                logger.info(`[Auditor] lib.rs is a wrapper. Automatically following pub mod: ${modName}`);
+                try {
+                   const modRes = await axios.get(baseUrl + `/src/${modName}.rs`, { timeout: 5000 });
+                   codeStr = modRes.data as string;
+                } catch {
+                   // Fallback to original lib.rs if module fetch fails
+                }
+              }
+            }
+            return { code: codeStr, contractType: 'github' }
           } catch {
-            const mainRes = await axios.get(rawUrl.replace(/\/$/, '') + '/src/main.rs', { timeout: 5000 })
-            return { code: mainRes.data as string, contractType: 'github' }
+            try {
+              const mainRes = await axios.get(baseUrl + '/src/main.rs', { timeout: 5000 })
+              return { code: mainRes.data as string, contractType: 'github' }
+            } catch {
+              throw new Error(`Failed to fetch GitHub source from directory: ${baseUrl}`)
+            }
           }
         }
         throw new Error(`Failed to fetch GitHub source: ${err.message}`)
@@ -251,7 +292,7 @@ ${x402Receipt ? `- **x402 Payment Proof:** \`${x402Receipt}\`\n` : ''}
 
     // Casper contract hash — try to get associated source via CSPR.cloud
     const contractInfo = await this.cloud.getContractInfo(target).catch(() => null)
-    if (contractInfo?.sourceUrl) {
+    if (contractInfo?.sourceUrl && this.isValidExternalUrl(contractInfo.sourceUrl)) {
       const res = await axios.get(contractInfo.sourceUrl, { timeout: 10000 })
       return { code: res.data as string, contractType: 'on-chain' }
     }
