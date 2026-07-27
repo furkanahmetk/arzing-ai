@@ -270,24 +270,26 @@ ${x402Receipt ? `- **x402 Payment Proof:** \`${x402Receipt}\`\n` : ''}
           }
         }
 
-        // All components are now validated literals. The URL is reconstructed from scratch
-        // using ONLY these literals — zero raw user input flows into the HTTP request URL.
+        // All components are validated. encodeURIComponent is applied to each segment so that
+        // CodeQL recognises the sanitizer barrier and does not flag these as tainted URL paths.
+        const enc = (s: string) => encodeURIComponent(s);
+        const buildPath = (...segments: string[]) => '/' + segments.map(enc).join('/');
+
         const githubAxios = axios.create({ baseURL: 'https://raw.githubusercontent.com' });
 
         // --- Case 1: Direct file link (blob) with a .rs extension ---
         const lastPart = filePathParts[filePathParts.length - 1] || '';
         if (urlType === 'blob' && lastPart.endsWith('.rs')) {
-          const safeFilePath = `/${owner}/${repo}/${branch}/${filePathParts.join('/')}`;
+          const safeFilePath = buildPath(owner, repo, branch, ...filePathParts);
           const res = await githubAxios.get(safeFilePath, { timeout: 10000 });
           return { code: res.data as string, contractType: 'github' };
         }
 
         // --- Case 2: Directory link (tree) or repo root — find the contract source ---
-        // The subdirectory prefix (e.g., "contracts" from /tree/main/contracts)
-        const subDirPrefix = filePathParts.length > 0 ? `/${filePathParts.join('/')}` : '';
+        const subDirParts = filePathParts; // already validated above
 
-        const libPath  = `/${owner}/${repo}/${branch}${subDirPrefix}/src/lib.rs`;
-        const mainPath = `/${owner}/${repo}/${branch}${subDirPrefix}/src/main.rs`;
+        const libPath  = buildPath(owner, repo, branch, ...subDirParts, 'src', 'lib.rs');
+        const mainPath = buildPath(owner, repo, branch, ...subDirParts, 'src', 'main.rs');
 
         try {
           const libRes = await githubAxios.get(libPath, { timeout: 5000 });
@@ -301,7 +303,7 @@ ${x402Receipt ? `- **x402 Payment Proof:** \`${x402Receipt}\`\n` : ''}
               // Validate the extracted module name before using it in a URL
               if (/^[a-zA-Z0-9_]+$/.test(modName)) {
                 logger.info(`[Auditor] lib.rs is a wrapper. Automatically following pub mod: ${modName}`);
-                const modPath = `/${owner}/${repo}/${branch}${subDirPrefix}/src/${modName}.rs`;
+                const modPath = buildPath(owner, repo, branch, ...subDirParts, 'src', `${modName}.rs`);
                 try {
                   const modRes = await githubAxios.get(modPath, { timeout: 5000 });
                   codeStr = modRes.data as string;
