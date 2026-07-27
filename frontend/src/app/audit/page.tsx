@@ -144,7 +144,21 @@ export default function AuditPage() {
       
       // Casper Wallet expects the exact JSON output from DeployUtil.deployToJson, which includes the { deploy: { ... } } wrapper.
       // Do NOT unwrap it, otherwise the wallet's internal parser fails to find `json.deploy.header` and throws `arg not valid`.
-      const signRes = await provider.sign(JSON.stringify(deployJson), activeAccount.address);
+      
+      // Wake up the extension's background service worker (Chrome suspends them after 30s of inactivity)
+      // Sending a lightweight request like getVersion forces the worker to wake up before we send the heavy sign request.
+      try { await provider.getVersion(); } catch (e) {}
+
+      let signRes;
+      try {
+        signRes = await provider.sign(JSON.stringify(deployJson), activeAccount.address);
+      } catch (err: any) {
+        // If the first attempt failed because the service worker was just waking up and dropped the message context,
+        // we retry immediately. Now that it is awake, the second attempt will succeed.
+        console.warn("First sign attempt failed (likely sleeping service worker), retrying...", err);
+        signRes = await provider.sign(JSON.stringify(deployJson), activeAccount.address);
+      }
+      
       if (signRes.cancelled) throw new Error("Transaction was cancelled by user.");
       
       // Casper Wallet returns the raw cryptographic signature bytes
