@@ -235,60 +235,92 @@ ${x402Receipt ? `- **x402 Payment Proof:** \`${x402Receipt}\`\n` : ''}
   }
 
   private async fetchSource(target: string): Promise<{ code: string; contractType: string }> {
-    let isGitHub = false;
-    let githubPathname = '';
+    // --- GitHub URL handling with strict SSRF prevention ---
+    // Strategy: Parse the URL into discrete components, validate each with an allowlist regex,
+    // and reconstruct the raw.githubusercontent.com URL from scratch using ONLY those validated
+    // components. This breaks CodeQL's "user input → HTTP request URL" data-flow path entirely.
     try {
       const parsedUrl = new URL(target);
-      if (parsedUrl.protocol === 'https:' && (parsedUrl.hostname === 'github.com' || parsedUrl.hostname === 'www.github.com')) {
-        isGitHub = true;
-        githubPathname = parsedUrl.pathname.replace('/blob/', '/').replace('/tree/', '/');
-        if (!githubPathname.startsWith('/')) githubPathname = '/' + githubPathname;
-      }
-    } catch {
-      // Not a valid URL
-    }
+      const isGitHub = parsedUrl.protocol === 'https:' &&
+        (parsedUrl.hostname === 'github.com' || parsedUrl.hostname === 'www.github.com');
 
-    if (isGitHub && githubPathname) {
-      // Hardcoding the baseURL prevents SSRF attacks by restricting requests exclusively to raw.githubusercontent.com
-      const githubAxios = axios.create({ baseURL: 'https://raw.githubusercontent.com' });
-      
-      try {
-        const res = await githubAxios.get(githubPathname, { timeout: 10000 })
-        return { code: res.data as string, contractType: 'github' }
-      } catch (err: any) {
-        // If it's a 404 (maybe it's a directory), try appending /src/lib.rs or /src/main.rs
-        if (err.response?.status === 404 && !githubPathname.endsWith('.rs')) {
-          const basePath = githubPathname.endsWith('/') ? githubPathname.slice(0, -1) : githubPathname;
-          let codeStr = '';
-          try {
-            const libRes = await githubAxios.get(basePath + '/src/lib.rs', { timeout: 5000 })
-            codeStr = libRes.data as string;
-            
-            // If lib.rs is just a small wrapper and points to a module, follow the module!
-            if (codeStr.split('\n').length < 20) {
-              const modMatch = codeStr.match(/pub\s+mod\s+([a-zA-Z0-9_]+);/);
-              if (modMatch && modMatch[1]) {
-                const modName = modMatch[1];
+      if (isGitHub) {
+        // GitHub paths: /<owner>/<repo>/blob/<branch>/<filepath>  (direct file)
+        //            or /<owner>/<repo>/tree/<branch>/<subdir>    (directory)
+        //            or /<owner>/<repo>                           (root)
+        const pathParts = parsedUrl.pathname.replace(/^\//, '').split('/');
+
+        // Strict allowlist: only alphanumeric, dash, underscore, and dot — no path traversal
+        const safeSegment = /^[a-zA-Z0-9._-]+$/;
+
+        const owner  = pathParts[0];
+        const repo   = pathParts[1];
+        const urlType = pathParts[2]; // 'blob', 'tree', or undefined
+        const branch = pathParts[3] || 'main';
+        // Remaining parts: the file or subdirectory path after the branch
+        const filePathParts = pathParts.slice(4).filter(p => p !== '');
+
+        // Validate every component — bail out if any segment is unsafe
+        if (!owner || !repo || !safeSegment.test(owner) || !safeSegment.test(repo) || !safeSegment.test(branch)) {
+          throw new Error('Invalid GitHub URL structure');
+        }
+        for (const part of filePathParts) {
+          if (!safeSegment.test(part)) {
+            throw new Error('Invalid characters in GitHub file path');
+          }
+        }
+
+        // All components are now validated literals. The URL is reconstructed from scratch
+        // using ONLY these literals — zero raw user input flows into the HTTP request URL.
+        const githubAxios = axios.create({ baseURL: 'https://raw.githubusercontent.com' });
+
+        // --- Case 1: Direct file link (blob) with a .rs extension ---
+        const lastPart = filePathParts[filePathParts.length - 1] || '';
+        if (urlType === 'blob' && lastPart.endsWith('.rs')) {
+          const safeFilePath = `/${owner}/${repo}/${branch}/${filePathParts.join('/')}`;
+          const res = await githubAxios.get(safeFilePath, { timeout: 10000 });
+          return { code: res.data as string, contractType: 'github' };
+        }
+
+        // --- Case 2: Directory link (tree) or repo root — find the contract source ---
+        // The subdirectory prefix (e.g., "contracts" from /tree/main/contracts)
+        const subDirPrefix = filePathParts.length > 0 ? `/${filePathParts.join('/')}` : '';
+
+        const libPath  = `/${owner}/${repo}/${branch}${subDirPrefix}/src/lib.rs`;
+        const mainPath = `/${owner}/${repo}/${branch}${subDirPrefix}/src/main.rs`;
+
+        try {
+          const libRes = await githubAxios.get(libPath, { timeout: 5000 });
+          let codeStr = libRes.data as string;
+
+          // If lib.rs is just a small wrapper pointing to a module, follow the module!
+          if (codeStr.split('\n').length < 20) {
+            const modMatch = codeStr.match(/pub\s+mod\s+([a-zA-Z0-9_]+);/);
+            if (modMatch && modMatch[1]) {
+              const modName = modMatch[1];
+              // Validate the extracted module name before using it in a URL
+              if (/^[a-zA-Z0-9_]+$/.test(modName)) {
                 logger.info(`[Auditor] lib.rs is a wrapper. Automatically following pub mod: ${modName}`);
+                const modPath = `/${owner}/${repo}/${branch}${subDirPrefix}/src/${modName}.rs`;
                 try {
-                   const modRes = await githubAxios.get(basePath + `/src/${modName}.rs`, { timeout: 5000 });
-                   codeStr = modRes.data as string;
+                  const modRes = await githubAxios.get(modPath, { timeout: 5000 });
+                  codeStr = modRes.data as string;
                 } catch {
-                   // Fallback to original lib.rs if module fetch fails
+                  // Fallback to original lib.rs if module fetch fails
                 }
               }
             }
-            return { code: codeStr, contractType: 'github' }
-          } catch {
-            try {
-              const mainRes = await githubAxios.get(basePath + '/src/main.rs', { timeout: 5000 })
-              return { code: mainRes.data as string, contractType: 'github' }
-            } catch {
-              throw new Error(`Failed to fetch GitHub source from directory: ${basePath}`)
-            }
           }
+          return { code: codeStr, contractType: 'github' };
+        } catch {
+          const mainRes = await githubAxios.get(mainPath, { timeout: 5000 });
+          return { code: mainRes.data as string, contractType: 'github' };
         }
-        throw new Error(`Failed to fetch GitHub source: ${err.message}`)
+      }
+    } catch (err: any) {
+      // Re-throw only errors from our own fetch attempts; other errors fall through
+      if (err.message?.startsWith('Failed to fetch') || err.message?.startsWith('Invalid')) {
+        throw err;
       }
     }
 
